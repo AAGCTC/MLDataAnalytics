@@ -1,0 +1,112 @@
+.history-section {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: var(--chalk-line);
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.history-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    color: var(--chalk-white);
+    margin-bottom: 0.5rem;
+    text-shadow: 0 0 3px rgba(255,255,255,0.3);
+}
+
+.history-subtitle {
+    color: var(--chalk-light);
+    font-size: 1rem;
+}
+
+.history-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.summary-card {
+    border: var(--chalk-line);
+    border-radius: var(--sketch-radius);
+    padding: 1.2rem 1.4rem;
+    background: rgba(255,255,255,0.02);
+    transition: var(--transition);
+}
+
+.summary-card:hover {
+    border-color: var(--neon-yellow);
+    transform: translateY(-3px);
+    box-shadow: 0 0 8px rgba(255, 255, 0, 0.15);
+}
+
+.summary-label {
+    color: var(--chalk-light);
+    font-size: 0.9rem;
+    margin-bottom: 0.6rem;
+}
+
+.summary-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--neon-green);
+    text-shadow: 0 0 6px rgba(57, 255, 20, 0.35);
+}
+
+.summary-muted {
+    color: var(--chalk-white);
+    font-size: 1rem;
+    font-weight: 600;
+    text-shadow: none;
+}
+
+.history-table .data-table td {
+    vertical-align: middle;
+}
+
+.history-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.8rem;
+    border-radius: var(--sketch-radius);
+    border: 1px dashed var(--chalk-light);
+    color: var(--chalk-white);
+    text-decoration: none;
+    transition: var(--transition);
+    font-size: 0.9rem;
+}
+
+.history-action:hover {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+    background: rgba(57, 255, 20, 0.08);
+}
+
+.history-file-name {
+    font-weight: 600;
+    color: var(--chalk-white);
+}
+
+.history-empty-text {
+    color: var(--chalk-light);
+}
+
+@media (max-width: 900px) {
+    .history-section {
+        padding: 1.5rem;
+    }
+
+    .table-scroll {
+        height: 360px;
+    }
+}

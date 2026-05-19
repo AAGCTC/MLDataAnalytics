@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}数据预览 - AnimeFlow 动漫与动漫电影文件数据分析系统{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/preview.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="preview-section">
+    <!-- 顶部操作栏：三栏式布局 -->
+    <div class="preview-header">
+        <div class="header-left">
+            <h1 class="preview-title">动漫与动漫电影数据预览</h1>
+            <p class="preview-subtitle">查看已上传的动漫/动漫电影数据文件与结构化内容</p>
+        </div>
+        
+        <div class="header-center">
+            <div class="control-group">
+                <div class="control-item">
+                    <label class="control-label">选择文件</label>
+                    <select id="history-file" class="chalk-select">
+                        <!-- 后端动态渲染 -->
+                    </select>
+                </div>
+                <div class="control-item">
+                    <label class="control-label">预览行数</label>
+                    <input type="number" id="row-count" class="chalk-input" value="100" min="1" max="1000">
+                </div>
+                <button id="preview-btn" class="btn btn-primary btn-lg ripple">
+                    加载预览
+                </button>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <button id="download-btn" class="btn btn-outline ripple" disabled>
+                下载
+            </button>
+            <button id="analyze-btn" class="btn btn-accent ripple" disabled>
+                开始分析
+            </button>
+        </div>
+    </div>
+
+    <!-- 主内容区：两列布局 -->
+    <div class="preview-main">
+        <!-- 左侧：文件信息与统计 -->
+        <div class="preview-sidebar">
+            <!-- 文件基本信息卡片 -->
+            <div class="info-card" id="file-info-card" style="display: none;">
+                <div class="card-header">
+                    <div class="card-icon">📑</div>
+                    <div class="card-title-group">
+                        <h3 class="card-title" id="current-file-name"></h3>
+                        <p class="card-subtitle" id="current-file-meta"></p>
+                    </div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="preview-row-count">0</div>
+                        <div class="stat-label">预览行数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-columns">0</div>
+                        <div class="stat-label">数据列数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="missing-values">0</div>
+                        <div class="stat-label">缺失值</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="data-quality">0%</div>
+                        <div class="stat-label">数据质量</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快速操作卡片 -->
+            <div class="info-card" id="quick-actions" style="display: none;">
+                <h3 class="card-title">快速操作</h3>
+                <div class="action-list">
+                    <button class="action-btn">
+                        <span class="action-icon">🔍</span>
+                        数据筛选
+                    </button>
+                    <button class="action-btn">
+                        <span class="action-icon">✂️</span>
+                        截取片段
+                    </button>
+                    <button class="action-btn">
+                        <span class="action-icon">🔄</span>
+                        刷新预览
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：数据表格与图表 -->
+        <div class="preview-content">
+            <!-- 空状态 -->
+            <div id="empty-state" class="state-container">
+                <div class="state-content">
+                    <div class="state-icon">📁</div>
+                    <h2 class="state-title">暂无数据预览</h2>
+                    <p class="state-desc">从上方选择一份数据文件，点击"加载预览"查看数据</p>
+                </div>
+            </div>
+
+            <!-- 加载状态 -->
+            <div id="loading-state" class="state-container" style="display: none;">
+                <div class="state-content">
+                    <div class="loading-spinner"></div>
+                    <h2 class="state-title">正在解析数据</h2>
+                    <p class="state-desc">正在解析动漫内容数据并生成预览，请稍候...</p>
+                </div>
+            </div>
+
+            <!-- 数据表格 -->
+            <div id="data-table-container" class="table-container" style="display: none;">
+                <div class="table-header">
+                    <h3 class="table-title">数据预览</h3>
+                    <div class="table-actions">
+                        <button class="table-btn">
+                            <span class="btn-icon">🔍</span>
+                            搜索
+                        </button>
+                        <button class="table-btn">
+                            <span class="btn-icon">📋</span>
+                            复制
+                        </button>
+                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table class="data-table">
+                        <thead id="preview-data-head"></thead>
+                        <tbody id="preview-data-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 图表预览 -->
+            <div id="charts-preview" class="charts-section" style="display: none;">
+                <h3 class="section-title">快速可视化</h3>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h4 class="chart-title">票房趋势</h4>
+                            <button class="chart-btn">📤</button>
+                        </div>
+                        <div class="chart-placeholder">
+                            <div class="chart-icon">📊</div>
+                            <p>点击生成票房曲线</p>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h4 class="chart-title">评分分布</h4>
+                            <button class="chart-btn">📤</button>
+                        </div>
+                        <div class="chart-placeholder">
+                            <div class="chart-icon">🥧</div>
+                            <p>点击生成评分占比</p>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h4 class="chart-title">地区热度</h4>
+                            <button class="chart-btn">📤</button>
+                        </div>
+                        <div class="chart-placeholder">
+                            <div class="chart-icon">📉</div>
+                            <p>点击生成热度对比</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='script/preview.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,142 @@
+.hero {
+    min-height: 80vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    background: transparent;
+}
+
+.hero-content {
+    max-width: 800px;
+}
+
+.hero-title {
+    font-size: 84px;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    line-height: 1.2;
+    color: var(--chalk-white);
+    text-shadow: 0 0 2px rgba(255,255,255,0.3);
+}
+
+.gradient-text, .gradient-text-2 {
+    color: var(--chalk-white);
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: unset;
+    background-clip: unset;
+    display: block;
+}
+
+.hero-subtitle {
+    font-size: 28px;
+    color: var(--chalk-light);
+    margin-bottom: 2rem;
+    line-height: 1.6;
+    max-width: 1000px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-tag {
+    font-size: 42px;
+    color: var(--chalk-white);
+    margin-bottom: 1rem;
+    font-weight: 600;
+    text-shadow: 0 0 5px rgb(255, 255, 255);
+}
+
+.hero-stats {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.features {
+    padding: 4rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    background: transparent;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.feature-card {
+    background: transparent;
+    border: var(--chalk-line);
+    border-radius: var(--sketch-radius);
+    padding: 2rem;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.feature-card::before {
+    display: none;
+}
+
+.feature-card:hover {
+    transform: translateY(-5px) rotate(1deg);
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 8px rgba(255,255,0,0.2);
+}
+
+.feature-card:hover .card-icon {
+    color: var(--neon-yellow);
+}
+
+.card-description {
+    color: var(--chalk-light);
+    line-height: 1.6;
+}
+
+.scenarios-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.scenario-card {
+    background: transparent;
+    border: var(--chalk-line);
+    border-radius: var(--sketch-radius);
+    padding: 1.5rem;
+    text-align: center;
+    transition: var(--transition);
+}
+
+.scenario-card:hover {
+    transform: translateY(-5px) rotate(1deg);
+    border-color: var(--neon-pink);
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+
+    .section-title {
+        font-size: 2rem;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+    }
+}

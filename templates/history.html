@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}数据记录 - AnimeFlow 动漫与动漫电影文件数据分析系统{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/history.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="history-section">
+	<div class="history-header">
+		<div class="header-left">
+			<h1 class="history-title">动漫数据上传记录</h1>
+			<p class="history-subtitle">按上传时间排序，最新数据文件在前</p>
+		</div>
+		<div class="header-actions">
+			<button class="btn btn-outline" id="history-refresh">
+				<span class="btn-icon">🔄</span>
+				刷新
+			</button>
+		</div>
+	</div>
+
+	<div class="history-summary">
+		<div class="summary-card">
+			<div class="summary-label">文件总数</div>
+			<div class="summary-value" id="history-total-count">0</div>
+		</div>
+		<div class="summary-card">
+			<div class="summary-label">最新上传</div>
+			<div class="summary-value summary-muted" id="history-latest-time">-</div>
+		</div>
+		<div class="summary-card">
+			<div class="summary-label">当前排序</div>
+			<div class="summary-value" id="history-sort-label">时间降序</div>
+		</div>
+	</div>
+
+	<div class="table-container history-table">
+		<div class="table-header">
+			<h3 class="table-title">数据列表</h3>
+			<div class="table-actions">
+				<button class="table-btn" id="history-sort-btn" data-order="desc">
+					<span class="btn-icon">⏱️</span>
+					切换排序
+				</button>
+			</div>
+		</div>
+		<div class="table-scroll">
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>数据文件名</th>
+						<th>大小</th>
+						<th>上传时间</th>
+						<th>总行数</th>
+						<th>总列数</th>
+						<th>操作</th>
+					</tr>
+				</thead>
+				<tbody id="history-table-body">
+					<tr class="empty-state">
+						<td colspan="6">
+							<div class="empty-content">
+								<span class="empty-icon">📭</span>
+								<p>暂无数据记录，请先上传</p>
+							</div>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='script/history.js') }}"></script>
+{% endblock %}

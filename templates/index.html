@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}AnimeFlow - 动漫与动漫电影文件数据分析指挥部{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/home.css') }}">
+{% endblock %}
+
+{% block content %}
+<!-- 英雄区（优化版） -->
+<section class="hero hero--enhanced">
+    <div class="hero-content">
+        <div class="hero-tag"> 动漫与动漫电影文件数据作战室</div>
+        <h1 class="hero-title">
+            <span class="gradient-text">用AI解码</span>
+            <span class="gradient-text gradient-text-2">动画宇宙</span>
+        </h1>
+        <p class="hero-subtitle hero-subtitle--compact">
+            上传动漫/动漫电影内容数据、票房、评分CSV/Excel/JSON等文件，10秒生成可视化分析报告，<br>
+            本地处理保障数据安全，零基础也能做专业动漫与动漫电影数据分析
+        </p>
+        <a id="index-start">
+            <label class="btn btn-primary ripple btn--large">
+                开始解析
+            </label>
+        </a>
+        <!-- 新增：数据化信任背书 -->
+        <div class="hero-stats">
+            <div class="stat-item">
+                <span class="stat-number">10万+</span>
+                <span class="stat-text">影迷/发行团队</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">1000万+</span>
+                <span class="stat-text">日均解析数据行</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number">99.9%</span>
+                <span class="stat-text">数据本地处理率</span>
+            </div>
+        </div>
+    </div>
+    <!-- 新增：英雄区可视化配图（占位，可配合CSS实现） -->
+    <div class="hero-visual">
+        <div class="visual-card">
+            <div class="card-chart"></div>
+            <div class="card-report"></div>
+        </div>
+    </div>
+</section>
+
+<!-- 核心优势区（替代原功能卡片，更聚焦用户价值） -->
+<section class="features features--refined">
+    <h2 class="section-title section-title--centered">
+        <span class="title-line"></span>
+        为什么选择 AnimeFlow
+        <span class="title-line"></span>
+    </h2>
+    <div class="features-grid features-grid--responsive">
+        <!-- 卡片1：零门槛使用 -->
+        <div class="feature-card feature-card--highlight">
+            <div class="card-icon card-icon--primary">🎯</div>
+            <h3 class="card-title">一键数据解析</h3>
+            <p class="card-description">
+                无需编程/统计知识，上传数据文件即可自动生成报告，小白也能秒变动漫数据分析师
+            </p>
+        </div>
+
+        <!-- 卡片2：本地安全 -->
+        <div class="feature-card feature-card--highlight">
+            <div class="card-icon card-icon--primary">🔒</div>
+            <h3 class="card-title">本地安全封存</h3>
+            <p class="card-description">
+                所有数据文件仅在本机处理，不上传至任何服务器，敏感数据绝对安全
+            </p>
+        </div>
+
+        <!-- 卡片3：多格式兼容 -->
+        <div class="feature-card">
+            <div class="card-icon">📊</div>
+            <h3 class="card-title">票房与评分可视化</h3>
+            <p class="card-description">
+                自动生成票房/评分/地区热度图表，直观呈现档期趋势与口碑变化
+            </p>
+        </div>
+
+        <!-- 卡片4：极速处理 -->
+        <div class="feature-card">
+            <div class="card-icon">⚡</div>
+            <h3 class="card-title">大档期秒级分析</h3>
+            <p class="card-description">
+                优化算法加持，即使百万行级数据集，也能秒级完成处理与分析
+            </p>
+        </div>
+
+        <!-- 卡片5：多格式支持 -->
+        <div class="feature-card">
+            <div class="card-icon">📋</div>
+            <h3 class="card-title">多平台数据兼容</h3>
+            <p class="card-description">
+                原生支持CSV/Excel/JSON/XML等格式，无需手动转换直接上传
+            </p>
+        </div>
+
+        <!-- 卡片6：报告导出 -->
+        <div class="feature-card">
+            <div class="card-icon">📄</div>
+            <h3 class="card-title">一键导出分析报告</h3>
+            <p class="card-description">
+                支持PDF/Excel/PNG等格式导出，报告包含图表、结论与建议，可直接复用
+            </p>
+        </div>
+    </div>
+</section>
+
+
+<!-- 新增：场景化应用模块 -->
+<section class="scenarios">
+    <h2 class="section-title section-title--centered">
+        <span class="title-line"></span>
+        适用于这些动漫数据场景
+        <span class="title-line"></span>
+    </h2>
+    <div class="scenarios-grid">
+        <div class="scenario-card">
+            <div class="scenario-icon">🏢</div>
+            <h3 class="scenario-title">动画电影排片分析</h3>
+            <p class="scenario-desc">票房走势、排片占比、场次表现快速分析</p>
+        </div>
+        <div class="scenario-card">
+            <div class="scenario-icon">🌟</div>
+            <h3 class="scenario-title">口碑评分对比</h3>
+            <p class="scenario-desc">评分分布、评论情绪、口碑变化趋势</p>
+        </div>
+        <div class="scenario-card">
+            <div class="scenario-icon">🎬</div>
+            <h3 class="scenario-title">IP宇宙规划</h3>
+            <p class="scenario-desc">系列表现、档期策略、衍生潜力洞察</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='script/home.js') }}"></script>
+{% endblock %}

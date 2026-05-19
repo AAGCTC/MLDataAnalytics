@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}上传数据 - AnimeFlow 动漫与动漫电影文件数据分析系统{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="upload-section">
+    <!-- 顶部标题区域 -->
+    <div class="upload-header">
+        <div class="header-left">
+            <h1 class="upload-title">
+                <span class="chalk-doodle">📝</span>
+                把你的动漫与动漫电影数据"写"在黑板上
+            </h1>
+            <p class="upload-subtitle">
+                拖进来，点一下，10秒后让数据文件开口说话
+                <span class="doodle-arrow">👇</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- 主上传区域 -->
+    <div class="upload-main">
+        <!-- 核心上传框 - 黑板风格 -->
+        <div class="upload-box" id="upload-box">
+            <!-- 黑板边框装饰 -->
+            <div class="chalk-corner top-left"></div>
+            <div class="chalk-corner top-right"></div>
+            <div class="chalk-corner bottom-left"></div>
+            <div class="chalk-corner bottom-right"></div>
+            
+            <!-- 上传状态切换 -->
+            <div class="upload-state" id="default-state">
+                <div class="upload-icon">
+                    <div class="floating-files">
+                        <span class="file-icon file-1">📄</span>
+                        <span class="file-icon file-2">📊</span>
+                        <span class="file-icon file-3">📈</span>
+                    </div>
+                </div>
+                <h2 class="upload-text">把数据文件拖到这块黑板上</h2>
+                <p class="upload-hint">或者</p>
+                <label for="file-input" class="btn btn-primary btn-lg chalk-btn">
+                    <span class="btn-icon">✏️</span>
+                    点击"写"入数据
+                </label>
+                <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.json,.xml" style="display: none;" multiple>
+            </div>
+
+            <!-- 拖拽高亮状态 -->
+            <div class="upload-state" id="drag-state" style="display: none;">
+                <div class="upload-icon">✨</div>
+                <h2 class="upload-text">松开手，数据文件就"粘"在黑板上了！</h2>
+                <div class="chalk-line-animation"></div>
+            </div>
+
+            <!-- 上传进度状态 -->
+            <div class="upload-state" id="progress-state" style="display: none;">
+                <div class="upload-icon">⏳</div>
+                <h2 class="upload-text">正在用粉笔"抄写"数据...</h2>
+                <div class="progress-container">
+                    <div class="chalk-progress">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p class="progress-text" id="progress-text">0%</p>
+                </div>
+                <p class="upload-tip" id="upload-tip">正在解析数据结构...</p>
+            </div>
+
+            <!-- 上传成功状态 -->
+            <div class="upload-state" id="success-state" style="display: none;">
+                <div class="upload-icon success-icon">✅</div>
+                <h2 class="upload-text">数据文件已"写"好！</h2>
+                <p class="upload-hint">3秒后自动跳转到预览基地</p>
+                <div class="countdown" id="countdown">3</div>
+            </div>
+        </div>
+
+        <!-- 下方趣味信息区 -->
+        <div class="upload-info">
+            <!-- 格式支持卡片 -->
+            <div class="info-card doodle-card">
+                <div class="card-header">
+                    <span class="card-icon">📋</span>
+                    <h3 class="card-title">我们认识这些数据格式</h3>
+                </div>
+                <div class="formats-list">
+                    <div class="format-item">
+                        <span class="format-icon">📄</span>
+                        <span class="format-name">CSV</span>
+                    </div>
+                    <div class="format-item">
+                        <span class="format-icon">📊</span>
+                        <span class="format-name">Excel</span>
+                    </div>
+                    <div class="format-item">
+                        <span class="format-icon">📝</span>
+                        <span class="format-name">JSON</span>
+                    </div>
+                    <div class="format-item">
+                        <span class="format-icon">📑</span>
+                        <span class="format-name">XML</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 限制说明卡片 -->
+            <div class="info-card doodle-card">
+                <div class="card-header">
+                    <span class="card-icon">⚠️</span>
+                    <h3 class="card-title">存储容量有限</h3>
+                </div>
+                <ul class="limits-list">
+                    <li>单个文件最大 <span class="highlight">100MB</span></li>
+                    <li>最多同时上传 <span class="highlight">5个</span> 文件</li>
+                    <li>所有数据 <span class="highlight">只在你电脑上</span> 处理</li>
+                </ul>
+            </div>
+
+            <!-- 趣味小贴士卡片 -->
+            <div class="info-card doodle-card">
+                <div class="card-header">
+                    <span class="card-icon">💡</span>
+                    <h3 class="card-title">小贴士</h3>
+                </div>
+                <p class="tip-text" id="random-tip">
+                    数据单元格越干净，分析越出彩。
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="{{ url_for('static', filename='script/upload.js') }}"></script>
+{% endblock %}

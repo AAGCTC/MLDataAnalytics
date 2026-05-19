@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 / 注册 - AnimeFlow 动漫与动漫电影数据分析</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/common.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+
+<body>
+    <main class="auth-page">
+        <div class="auth-shell">
+            <section class="auth-hero">
+                <div class="auth-brand">AnimeFlow</div>
+                <h1 class="auth-title">欢迎回来，开启你的动漫数据作战室</h1>
+                <p class="auth-subtitle">登录继续分析动漫与动漫电影数据，注册解锁专属数据空间与报告。</p>
+            </section>
+
+            <section class="auth-card">
+                <div class="auth-tabs" role="tablist" aria-label="登录注册切换">
+                    <button class="auth-tab is-active" type="button" data-tab="login" role="tab" aria-selected="true">登录</button>
+                    <button class="auth-tab" type="button" data-tab="register" role="tab" aria-selected="false">注册</button>
+                </div>
+
+                <form class="auth-form is-active" id="login-form" action="#" method="post" autocomplete="off">
+                    <div class="auth-field">
+                        <label class="auth-label" for="login-identity">邮箱或用户名</label>
+                        <input class="chalk-input auth-input" id="login-identity" type="text" placeholder="yourname@example.com" required>
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-label" for="login-password">密码</label>
+                        <input class="chalk-input auth-input" id="login-password" type="password" placeholder="••••••••" required autocomplete="new-password">
+                    </div>
+                    <div class="auth-row">
+                        <label>
+                            <input type="checkbox" checked>
+                            记住我
+                        </label>
+                        <a class="auth-link" href="#">忘记密码？</a>
+                    </div>
+                    <button class="btn btn-primary btn-lg" type="submit">立即登录</button>
+                </form>
+
+                <form class="auth-form" id="register-form" action="#" method="post" autocomplete="off">
+                    <div class="auth-field">
+                        <label class="auth-label" for="register-name">昵称</label>
+                        <input class="chalk-input auth-input" id="register-name" type="text" placeholder="取个酷一点的名字" required autocomplete="off">
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-label" for="register-email">邮箱</label>
+                        <input class="chalk-input auth-input" id="register-email" type="email" placeholder="name@example.com" required autocomplete="off">
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-label" for="register-password">设置密码</label>
+                        <input class="chalk-input auth-input" id="register-password" type="password" placeholder="至少 8 位" required autocomplete="new-password">
+                    </div>
+                    <div class="auth-field">
+                        <label class="auth-label" for="register-confirm">确认密码</label>
+                        <input class="chalk-input auth-input" id="register-confirm" type="password" placeholder="再次输入密码" required autocomplete="new-password">
+                    </div>
+                    <div class="auth-row">
+                        <label>
+                            <input type="checkbox" required>
+                            我已阅读并同意服务条款
+                        </label>
+                        <a class="auth-link" href="#">查看条款</a>
+                    </div>
+                    <button class="btn btn-accent btn-lg" type="submit">创建账号</button>
+                </form>
+                <div class="auth-message" id="auth-message">演示页面，暂未接入后端登录接口。</div>
+            </section>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='script/auth.js') }}"></script>
+    <script src="{{ url_for('static', filename='script/common.js') }}"></script>
+</body>
+
+</html>
