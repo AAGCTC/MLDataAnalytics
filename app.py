@@ -244,8 +244,148 @@ def test_db():
         return '✅ MySQL连接成功！'
     except Exception as e:
         return f'❌ MySQL连接失败：{str(e)}'
-    
 
+"""
+from ml_algorithm import create_analyzer
+
+
+# ========== 机器学习API ==========
+
+@app.route('/api/ml/info/<int:file_id>', methods=['GET'])
+def ml_info(file_id):  
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    return jsonify({'success': True, 'data': analyzer.get_info()})
+
+
+@app.route('/api/ml/predict/<int:file_id>', methods=['POST'])
+def ml_predict(file_id):
+    data = request.get_json()
+    target = data.get('target')
+    features = data.get('features', None)
+
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+
+    info = analyzer.get_info()
+    if target in info['categorical_cols'] or (target in analyzer.df.columns and analyzer.df[target].nunique() <= 10):
+        result = analyzer.classification(target, features)
+    else:
+        result = analyzer.regression(target, features)
+
+    return jsonify(result)
+
+
+@app.route('/api/ml/cluster/<int:file_id>', methods=['POST'])
+def ml_cluster(file_id):
+    data = request.get_json()
+    n_clusters = data.get('n_clusters', 3)
+    features = data.get('features', None)
+
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    result = analyzer.clustering(n_clusters, features)
+
+    return jsonify(result)
+
+
+# ========== 数据清洗API ==========
+
+@app.route('/api/clean/info/<int:file_id>', methods=['GET'])
+def clean_info(file_id):
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    return jsonify({'success': True, 'data': analyzer.get_clean_info()})
+
+
+@app.route('/api/clean/missing/<int:file_id>', methods=['POST'])
+def clean_missing(file_id):
+    data = request.get_json()
+    strategy = data.get('strategy', 'mean')
+    fill_value = data.get('fill_value', None)
+
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    result = analyzer.handle_missing(strategy, fill_value)
+    analyzer.df.to_csv(file_path, index=False, encoding='utf-8-sig')
+
+    return jsonify(result)
+
+
+@app.route('/api/clean/duplicates/<int:file_id>', methods=['POST'])
+def clean_duplicates(file_id):
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    result = analyzer.remove_duplicates()
+    analyzer.df.to_csv(file_path, index=False, encoding='utf-8-sig')
+
+    return jsonify(result)
+
+
+@app.route('/api/clean/outliers/<int:file_id>/<string:column>', methods=['GET'])
+def detect_outliers(file_id, column):
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    result = analyzer.detect_outliers(column)
+
+    return jsonify(result)
+
+
+@app.route('/api/clean/outliers/<int:file_id>/<string:column>', methods=['POST'])
+def handle_outliers(file_id, column):
+    data = request.get_json()
+    method = data.get('method', 'cap')
+
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    result = analyzer.handle_outliers(column, method)
+    analyzer.df.to_csv(file_path, index=False, encoding='utf-8-sig')
+
+    return jsonify(result)
+
+
+@app.route('/api/clean/stats/<int:file_id>/<string:column>', methods=['GET'])
+def column_stats(file_id, column):
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': '文件不存在'}), 404
+
+    file_path = os.path.join(app.root_path, file_record.file_path)
+    analyzer = create_analyzer(file_path)
+    result = analyzer.get_stats(column)
+
+    return jsonify(result)
+"""
 # 启动应用
 if __name__ == '__main__':
     app.run(debug=True)
