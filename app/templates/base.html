@@ -33,22 +33,27 @@
         {% set current_path = request.path %}
         <ul class="sidebar-menu" id="sidebar-menu">
             <li class="nav-item">
-                <a href="{{ url_for('index') }}" class="nav-link {% if current_path == '/' or current_path == '/index' %}active{% endif %}" data-short="H" tabindex="0">
+                <a href="{{ url_for('main.index') }}" class="nav-link {% if current_path == '/' or current_path == '/index' %}active{% endif %}" data-short="H" tabindex="0">
                     <span class="nav-text">首页</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('upload') }}" class="nav-link {% if current_path == '/upload' %}active{% endif %}" data-short="U" tabindex="0">
+                <a href="{{ url_for('main.upload') }}" class="nav-link {% if current_path == '/upload' %}active{% endif %}" data-short="U" tabindex="0">
                     <span class="nav-text">上传数据</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('preview') }}" class="nav-link {% if current_path == '/preview' %}active{% endif %}" data-short="P" tabindex="0">
+                <a href="{{ url_for('main.preview') }}" class="nav-link {% if current_path == '/preview' %}active{% endif %}" data-short="P" tabindex="0">
                     <span class="nav-text">数据预览</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="{{ url_for('history') }}" class="nav-link {% if current_path == '/history' %}active{% endif %}" data-short="R" tabindex="0">
+                <a href="{{ url_for('main.analysis') }}" class="nav-link {% if current_path == '/analysis' %}active{% endif %}" data-short="A" tabindex="0">
+                    <span class="nav-text">数据分析</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="{{ url_for('main.history') }}" class="nav-link {% if current_path == '/history' %}active{% endif %}" data-short="R" tabindex="0">
                     <span class="nav-text">数据记录</span>
                 </a>
             </li>
@@ -65,7 +70,7 @@
                 </button>
                 <div class="account-dropdown" role="menu" aria-label="个人中心菜单">
                     <a class="account-item" href="#" role="menuitem">个人资料</a>
-                    <a class="account-item" href="{{ url_for('auth') }}" data-auth-item role="menuitem">登录</a>
+                    <a class="account-item" href="{{ url_for('main.auth') }}" data-auth-item role="menuitem">登录</a>
                 </div>
             </div>
         </div>
