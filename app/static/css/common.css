@@ -57,7 +57,9 @@ button, input, select, textarea {
 .page-shell {
     min-height: 100vh;
     margin-left: var(--sidebar-width);
-    transition: margin-left 0.35s ease;
+    transition: transform 0.35s ease;
+    transform: translateX(0);
+    will-change: transform;
     display: flex;
     flex-direction: column;
 }
@@ -85,6 +87,7 @@ button, input, select, textarea {
     display: flex;
     flex-direction: column;
     transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    will-change: width;
     overflow: visible;
     white-space: nowrap;
 }
@@ -281,7 +284,7 @@ body.sidebar-collapsed .sidebar {
 }
 
 body.sidebar-collapsed .page-shell {
-    margin-left: var(--sidebar-collapsed);
+    transform: translateX(calc(var(--sidebar-collapsed) - var(--sidebar-width)));
 }
 
 body.sidebar-collapsed .logo-text,

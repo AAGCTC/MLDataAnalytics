@@ -69,7 +69,7 @@ function initFileUpload() {
 
     const uploadFile = (file) => new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/upload', true);
+        xhr.open('POST', '/api/files/upload', true);
 
         xhr.upload.addEventListener('progress', (event) => {
             if (!event.lengthComputable) {
