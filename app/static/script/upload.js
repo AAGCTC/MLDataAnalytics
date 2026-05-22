@@ -97,6 +97,7 @@ function initFileUpload() {
         });
 
         const formData = new FormData();
+        formData.append('user_id', localStorage.getItem('animeflowUserId'));
         formData.append('file', file);
         xhr.send(formData);
     });
@@ -133,7 +134,11 @@ function initFileUpload() {
 
     fileInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
-        handleFile(file);
+        if(localStorage.getItem('animeflowUserId')) {
+            handleFile(file);
+        }else{
+            showNotification('请先登录后再上传文件', 'warning');
+        }
     });
 
     uploadBox.addEventListener('dragenter', (event) => {

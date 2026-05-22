@@ -48,6 +48,11 @@
                 </a>
             </li>
             <li class="nav-item">
+                <a href="{{ url_for('main.clean') }}" class="nav-link {% if current_path == '/clean' %}active{% endif %}" data-short="C" tabindex="0">
+                    <span class="nav-text">数据清洗</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="{{ url_for('main.analysis') }}" class="nav-link {% if current_path == '/analysis' %}active{% endif %}" data-short="A" tabindex="0">
                     <span class="nav-text">数据分析</span>
                 </a>
