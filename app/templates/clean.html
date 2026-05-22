@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}数据清洗 - AnimeFlow 动漫与动漫电影文件数据分析系统{% endblock %}
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/clean.css') }}">
+{% endblock %}
+{% block content %}
+<section class="clean-section">
+    <!-- 顶部标题区域 -->
+    <div class="clean-header">
+        <div class="header-left">
+            <h1 class="clean-title">
+                给你的动漫数据"擦黑板"
+            </h1>
+            <p class="clean-subtitle">
+                自动检测空值与异常值，一键清洗让数据干干净净
+            </p>
+        </div>
+    </div>
+
+    <!-- 主内容区：三步骤流程 -->
+    <div class="clean-main">
+        <!-- 步骤01：选择数据文件 -->
+        <div class="panel" id="panel-file">
+            <div class="panel-head">
+                <div class="panel-head-left">
+                    <span class="panel-step-badge">01</span>
+                    <div>
+                        <h2 class="panel-title">选择数据文件</h2>
+                        <p class="panel-sub">加载文件后自动检测数据质量问题</p>
+                    </div>
+                </div>
+                <div class="panel-status" id="clean-status">
+                    <span class="status-dot"></span>待机
+                </div>
+            </div>
+            <div class="panel-body">
+                <label class="field-label" for="clean-file">数据文件</label>
+                <select id="clean-file" class="chalk-select"></select>
+                <p class="field-meta" id="clean-file-meta">未选择文件</p>
+                
+                <div class="meta-grid">
+                    <div class="meta-item">
+                        <span class="meta-label-text">总行数</span>
+                        <strong id="clean-rows">-</strong>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label-text">总列数</span>
+                        <strong id="clean-columns">-</strong>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label-text">文件大小</span>
+                        <strong id="clean-size">-</strong>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label-text">上传时间</span>
+                        <strong id="clean-upload-time">-</strong>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg" id="detect-btn" disabled>
+                    开始检测
+                </button>
+            </div>
+        </div>
+
+        <!-- 步骤02：数据质量检测结果 -->
+        <div class="panel" id="panel-detect" style="display: none;">
+            <div class="panel-head">
+                <div class="panel-head-left">
+                    <span class="panel-step-badge">02</span>
+                    <div>
+                        <h2 class="panel-title">数据质量检测</h2>
+                        <p class="panel-sub">发现以下数据问题需要处理</p>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- 质量统计卡片 -->
+                <div class="quality-stats">
+                    <div class="stat-card quality-card">
+                        <div class="stat-content">
+                            <div class="stat-value" id="null-count">0</div>
+                            <div class="stat-label">空值行数</div>
+                        </div>
+                        <div class="stat-percent" id="null-percent">0%</div>
+                    </div>
+                    
+                    <div class="stat-card quality-card">
+                        <div class="stat-content">
+                            <div class="stat-value" id="outlier-count">0</div>
+                            <div class="stat-label">异常值行数</div>
+                        </div>
+                        <div class="stat-percent" id="outlier-percent">0%</div>
+                    </div>
+                    
+                    <div class="stat-card quality-card">
+                        <div class="stat-content">
+                            <div class="stat-value" id="valid-count">0</div>
+                            <div class="stat-label">有效行数</div>
+                        </div>
+                        <div class="stat-percent" id="valid-percent">100%</div>
+                    </div>
+                    
+                    <div class="stat-card quality-card">
+                        <div class="stat-content">
+                            <div class="stat-value" id="data-quality">100%</div>
+                            <div class="stat-label">数据质量评分</div>
+                        </div>
+                        <div class="quality-bar">
+                            <div class="quality-fill" id="quality-fill" style="width: 100%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 问题数据预览标签页 -->
+                <div class="preview-tabs">
+                    <button class="tab-btn is-active" data-tab="null-rows">
+                        空值行 (前100条)
+                    </button>
+                    <button class="tab-btn" data-tab="outlier-rows">
+                        异常值行 (前100条)
+                    </button>
+                </div>
+
+                <div class="tab-content is-active" id="null-rows-tab">
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3 class="table-title">空值数据预览</h3>
+                            <div class="table-actions">
+                                <span class="table-info">显示前100条记录</span>
+                            </div>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="data-table" id="null-table">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="outlier-rows-tab">
+                    <div class="table-container">
+                        <div class="table-header">
+                            <h3 class="table-title">异常值数据预览</h3>
+                            <div class="table-actions">
+                                <span class="table-info">显示前100条记录</span>
+                            </div>
+                        </div>
+                        <div class="table-scroll">
+                            <table class="data-table" id="outlier-table">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步骤03：清洗规则配置与执行 -->
+        <div class="panel" id="panel-clean" style="display: none;">
+            <div class="panel-head">
+                <div class="panel-head-left">
+                    <span class="panel-step-badge">03</span>
+                    <div>
+                        <h2 class="panel-title">配置清洗规则</h2>
+                        <p class="panel-sub">选择合适的规则处理数据问题</p>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <!-- 清洗规则选择 -->
+                <div class="rules-container">
+                    <div class="rule-group">
+                        <label class="rule-label">空值处理规则</label>
+                        <select id="null-rule" class="chalk-select">
+                            <option value="drop">删除包含空值的行</option>
+                            <option value="fill-mean">数值列用均值填充</option>
+                            <option value="fill-median">数值列用中位数填充</option>
+                            <option value="fill-mode">所有列用众数填充</option>
+                            <option value="fill-zero">数值列用0填充</option>
+                            <option value="fill-empty">文本列用空字符串填充</option>
+                        </select>
+                    </div>
+
+                    <div class="rule-group">
+                        <label class="rule-label">异常值处理规则</label>
+                        <select id="outlier-rule" class="chalk-select">
+                            <option value="drop">删除包含异常值的行</option>
+                            <option value="cap">用上下限截断（盖帽法）</option>
+                            <option value="replace-mean">用均值替换</option>
+                            <option value="replace-median">用中位数替换</option>
+                            <option value="ignore">忽略异常值（不处理）</option>
+                        </select>
+                    </div>
+
+                    <div class="rule-group">
+                        <label class="rule-label">重复值处理</label>
+                        <select id="duplicate-rule" class="chalk-select">
+                            <option value="drop">删除重复行（保留第一条）</option>
+                            <option value="keep">保留所有重复行</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 清洗进度 -->
+                <div class="clean-progress" id="clean-progress" style="display: none;">
+                    <div class="progress-container">
+                        <div class="chalk-progress">
+                            <div class="progress-fill" id="clean-progress-fill"></div>
+                        </div>
+                        <p class="progress-text" id="clean-progress-text">0%</p>
+                    </div>
+                    <p class="clean-tip" id="clean-tip">正在清洗数据...</p>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="clean-actions">
+                    <button class="btn btn-accent btn-lg" id="clean-btn">
+                        执行清洗
+                    </button>
+                    <button class="btn btn-outline btn-lg" id="download-btn" disabled>
+                        下载清洗后数据
+                    </button>
+                </div>
+
+                <!-- 清洗结果摘要 -->
+                <div class="clean-summary" id="clean-summary" style="display: none;">
+                    <h3 class="summary-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        清洗完成
+                    </h3>
+                    <ul class="summary-list">
+                        <li>原始数据行数：<span id="original-rows">0</span></li>
+                        <li>清洗后数据行数：<span id="cleaned-rows">0</span></li>
+                        <li>删除空值行数：<span id="deleted-nulls">0</span></li>
+                        <li>处理异常值行数：<span id="handled-outliers">0</span></li>
+                        <li>删除重复行数：<span id="deleted-duplicates">0</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+{% block page_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="{{ url_for('static', filename='script/clean.js') }}"></script>
+{% endblock %}

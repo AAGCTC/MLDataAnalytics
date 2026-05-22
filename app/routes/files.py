@@ -3,10 +3,9 @@ import chardet
 import pandas as pd
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from flask import Blueprint, request, jsonify, current_app
-from app.models import db, File
-from app.ml_algorithm import DataAnalyzer
-from app.utils import load_dataframe, build_line_payload, build_distribution_payload, build_scatter_payload, build_radar_payload
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
+from app.models import db, File,UserFiles
+from urllib.parse import quote
 
 files_bp = Blueprint('files', __name__, url_prefix='/api/files')
 
@@ -15,15 +14,19 @@ def upload_file():
     """文件上传接口"""
     if 'file' not in request.files:
         return jsonify({'error': 'missing file'}), 400
-
+    if 'user_id' not in request.form:
+        return jsonify({'error': 'missing user_id'}), 400
     file = request.files['file']
+    user_id = request.form['user_id']
     if not file or file.filename == '':
         return jsonify({'error': 'empty filename'}), 400
-
+    print(f"Received file upload: filename={file.filename}, user_id={user_id}")
     # 创建上传目录
     os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+    user_upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], str(user_id))
+    os.makedirs(user_upload_dir, exist_ok=True)
     filename = secure_filename(file.filename)
-    save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+    save_path = os.path.join(user_upload_dir, filename)
     file.save(save_path)
 
     # 解析文件统计信息
@@ -53,27 +56,32 @@ def upload_file():
         save_name=filename,
         file_size=os.path.getsize(save_path),
         mime_type=file.mimetype,
-        file_path=os.path.join('uploads', filename),
+        file_path=os.path.join('uploads', user_id, filename),
         total_rows=total_rows,
         total_columns=total_columns
     )
     db.session.add(new_file)
     db.session.commit()
-
+    user_file = UserFiles(user_id=user_id, file_id=new_file.id)
+    db.session.add(user_file)
+    db.session.commit()
     return jsonify({
         'message': 'uploaded',
         'filename': filename,
         'fileId': new_file.id
     }), 200
 
-@files_bp.route('/history', methods=['GET'])
-def get_file_history():
+@files_bp.route('/<int:user_id>/history', methods=['GET'])
+def get_file_history(user_id):
     """获取文件上传历史"""
-    files = File.query.order_by(File.upload_time.desc()).all()
+    print(f"Fetching file history for user_id={user_id}")
+    filesid_list = db.session.query(UserFiles.file_id).filter_by(user_id=user_id).all()
+    filesid_list = [file_id for (file_id,) in filesid_list]
+    files = db.session.query(File).filter(File.id.in_(filesid_list)).order_by(File.upload_time.desc()).all()
     return jsonify({'data': [file.to_dict() for file in files]})
 
-@files_bp.route('/history/<int:file_id>/preview', methods=['GET'])
-def get_file_preview(file_id):
+@files_bp.route('/<int:user_id>/history/<int:file_id>/preview', methods=['GET'])
+def get_file_preview(user_id, file_id):
     """获取文件预览数据"""
     row_count = request.args.get('rowCount', default=100, type=int)
     file_record = db.session.get(File, file_id)
@@ -126,8 +134,8 @@ def get_file_preview(file_id):
 #   ]
 # }
 #顺序保持一致，前端根据返回的data数组顺序渲染图表
-@files_bp.route('/history/<int:file_id>/visualization', methods=['POST'])
-def Visualization(file_id):
+@files_bp.route('/<int:user_id>/history/<int:file_id>/visualization', methods=['POST'])
+def Visualization(user_id, file_id):
     request_data = request.get_json()
     chartsconfig = request_data.get('chartConfig')
     if not chartsconfig:
@@ -145,56 +153,156 @@ def Visualization(file_id):
     return jsonify({'success': True, 'data': result})
 
 
-@files_bp.route('/history/<int:file_id>/analyze', methods=['GET'])
-def analyze_file(file_id):
-    """对指定上传文件运行基础数据分析并返回可视化负载"""
+# 文件检测接口，返回缺失值数量和重复行数量以及异常值等统计信息
+@files_bp.route('/<int:file_id>/detect', methods=['POST'])
+def detect_file(file_id):
+    """文件检测接口"""
+    request_data = request.get_json()
+    user_id = request_data.get('userId')
     file_record = db.session.get(File, file_id)
     if not file_record:
         return jsonify({'error': 'file not found'}), 404
+    user_fileIds=db.session.query(UserFiles.file_id).filter_by(user_id=user_id).all()
+    user_fileIds=[fid for (fid,) in user_fileIds]
+    print(f"user_id={user_id}, file_id={file_id}, user_fileIds={user_fileIds}")
+    if file_id not in user_fileIds:
+        return jsonify({'error': 'file does not belong to user'}), 403
+    
+    # 这里可以添加实际的文件检测逻辑，统计缺失值、重复行、异常值等信息
+    # fileid可以用来定位文件路径，读取文件内容进行分析
+    # 目前返回的是模拟数据，实际实现时需要根据文件内容进行计算
+    # 返回数据格式示例：
+    return jsonify({
+        # 文件总行数
+        "totalRows": 1000,
+        # 空值行数
+        "nullRows": 50,
+        # 异常值行数
+        "outlierRows": 20,
+        # 所有列名
+        "nullHeaders": ["id", "name", "score"],
+        # 包含空值的行数据，格式为二维数组，每个子数组表示一行数据
+        "nullData": [[1, "Naruto", None],[2, None, 9.2],[4, "One Piece", None],
+                     [5, None, None],[6, "Dragon Ball", None],[7, None, None],
+                     [8, "Attack on Titan", None],[9, None, 8.9],[10, "My Hero Academia", None],
+                     [11, None, None],[12, "Demon Slayer", None],[13, None, 8.5],
+                     [14, "Jujutsu Kaisen", None],[15, None, None],[16, "Tokyo Revengers", None],
+                     [17, None, 7.8],[18, "Fullmetal Alchemist", None],[19, None, 9.0],
+                     [20, "Death Note", None]],
+        # 包含异常值的行数据，格式同上
+        "outlierHeaders": ["id", "name", "score"],
+        "outlierData": [[3, "Bleach", 15.0],[21, "One Punch Man", 12.0],[22, "Fairy Tail", 14.5],
+                        [23, "Sword Art Online", 13.0],[24, "Black Clover", 16.0],[25, "My Hero Academia", 14.0],
+                        [26, "Demon Slayer", 17.0],[27, "Jujutsu Kaisen", 18.0],[28, "Tokyo Revengers", 19.0],
+                        [29, "Fullmetal Alchemist", 20.0],[30, "Death Note", 21.0]],
+        "effectiveRows": 930,
+        "qualityScore": 93.0
+    })
+    
+# userId: localStorage.getItem('animeflowUserId'),
+# rules: {
+# null: nullRule,
+# outlier: outlierRule,
+# duplicate: duplicateRule
+# }
+@files_bp.route('/<int:file_id>/clean', methods=['POST'])
+def clean_file(file_id):
+    request_data = request.get_json()
+    user_id = request_data.get('userId')
+    rules = request_data.get('rules')
+    file_record = db.session.get(File, file_id)
+    if not file_record:
+        return jsonify({'error': 'file not found'}), 404
+    user_fileIds=db.session.query(UserFiles.file_id).filter_by(user_id=user_id).all()
+    user_fileIds=[fid for (fid,) in user_fileIds]
+    print(f"user_id={user_id}, file_id={file_id}, user_fileIds={user_fileIds}")
+    if file_id not in user_fileIds:
+        return jsonify({'error': 'file does not belong to user'}), 403
+    # 创建清洗后文件保存目录
+    cleaned_dir = os.path.join(current_app.config['CLEANED_FOLDER'], str(user_id))
+    os.makedirs(cleaned_dir, exist_ok=True)
+    file_record.is_cleaned = True
+    file_record.cleaned_path = os.path.join('cleaned', str(user_id), f"cleaned_{file_record.save_name}")
+    db.session.commit()
+    # 这里可以添加实际的文件清洗逻辑，根据传入的规则进行数据清洗
+    # fileid可以用来定位文件路径，读取文件内容进行清洗处理  
+    # 目前返回的是模拟数据，实际实现时需要根据文件内容和清洗规则进行处理
+    # 返回数据格式示例：
+    return jsonify({
+        "success": True,
+        "cleanedFileId": file_record.id,  # 清洗后文件的ID，前端可以用这个ID来下载清洗后的文件
+        "summary": {
+            "originalRows": 1000,
+            "cleanedRows": 920,
+            "deletedNulls": 50,
+            "handledOutliers": 20,
+            "deletedDuplicates": 10
+        }
+    })
+    
+    
+@files_bp.route('/<int:file_id>/download', methods=['GET'])
+def download_file(file_id):
+    # 1. 验证用户身份
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        print("Missing or invalid Authorization header")
+        return jsonify({'error': '未授权访问'}), 401
+    
+    user_id = auth_header.split(' ')[1]
+    if not user_id:
+        print("Invalid user ID in Authorization header")
+        return jsonify({'error': '用户ID无效'}), 401
 
-    file_path = os.path.join(current_app.root_path, '..', file_record.file_path)
+    # 2. 查询文件信息
+    file = File.query.get(file_id)
+    if not file:
+        print(f"File with ID {file_id} not found")
+        return jsonify({'error': '文件不存在'}), 404
+
+    # 3. 验证文件归属权限
+    user_fileIds = db.session.query(UserFiles.file_id).filter_by(user_id=user_id).all()
+    user_fileIds = [fid for (fid,) in user_fileIds]
+    if file.id not in user_fileIds:
+        print(f"File with ID {file_id} does not belong to user {user_id}")
+        return jsonify({'error': '无权访问该文件'}), 403
+
+    # 4. 确定文件存储目录
+    if file.is_cleaned:
+        file_path = file.cleaned_path 
+    else:
+        file_path = file.file_path
+        
+    # 5. 检查文件是否实际存在于服务器
+    if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        print(f"File path {file_path} does not exist or is not a file")
+        return jsonify({'error': '文件已损坏或不存在'}), 404
+
     try:
-        # 使用 utils 加载 DataFrame（会自动处理编码和格式）
-        df = load_dataframe(file_path)
+        # 6. 处理中文文件名（兼容所有浏览器）
+        encoded_filename = quote(file.original_name)
+        # 生成下载文件名（清洗后的文件自动添加前缀）
+        download_filename = f"cleaned_{file.original_name}" if file.is_cleaned else file.original_name
+        encoded_download_filename = quote(download_filename)
+        print(f"Preparing to send file: {file_path}, original_name={file.original_name}, download_name={download_filename}")
+        # 7. 发送文件
+        # 7. 使用send_file替代send_from_directory（关键修复）
+        from flask import send_file
+        
+        response = send_file(
+            path_or_file=os.path.join(os.getcwd(), file_path),
+            as_attachment=True,
+            mimetype='text/csv'  # 明确指定CSV文件的MIME类型
+        )
+        
+        # 手动设置Content-Disposition头确保中文兼容
+        response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_download_filename}"
+        
+        return response
+
     except Exception as e:
-        current_app.logger.error(f"Failed to load file for analysis: {e}")
-        return jsonify({'error': 'failed to load file for analysis'}), 500
-
-    try:
-        analyzer = DataAnalyzer(df)
-
-        # 基本摘要
-        summary = analyzer.get_info()
-        clean = analyzer.get_clean_info()
-
-        # 构建图表负载：折线/分布/散点/雷达（可根据数据存在性选择）
-        charts = []
-
-        line_payload = build_line_payload(df, analyzer.numeric_cols, limit=60)
-        if line_payload:
-            charts.append({'type': 'line', 'data': line_payload})
-
-        # 选择一个合适的列用于分布图：优先非数值列，否则第一个数值列
-        dist_column = None
-        for col in analyzer.categorical_cols:
-            dist_column = col
-            break
-        if not dist_column and analyzer.numeric_cols:
-            dist_column = analyzer.numeric_cols[0]
-        if dist_column:
-            dist_payload = build_distribution_payload(df, dist_column)
-            if dist_payload:
-                charts.append({'type': 'bar', 'data': dist_payload})
-
-        scatter_payload = build_scatter_payload(df, analyzer.numeric_cols, limit=200)
-        if scatter_payload:
-            charts.append({'type': 'scatter', 'data': scatter_payload})
-
-        radar_payload = build_radar_payload(analyzer, analyzer.numeric_cols)
-        if radar_payload:
-            charts.append({'type': 'radar', 'data': radar_payload})
-
-        return jsonify({'success': True, 'summary': summary, 'clean': clean, 'charts': charts})
-    except Exception as e:
-        current_app.logger.error(f"Analysis failed: {e}")
-        return jsonify({'error': 'analysis failed'}), 500
+        print(f"Error during file download: {e}")
+        print("当前工作目录:", os.getcwd())
+        print("当前代码文件所在目录:", os.path.dirname(os.path.abspath(__file__)))
+        current_app.logger.error(f"文件下载失败: {str(e)}")
+        return jsonify({'error': f'下载失败: {str(e)}'}), 500

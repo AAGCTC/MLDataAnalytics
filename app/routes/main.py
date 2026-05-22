@@ -26,3 +26,7 @@ def history():
 @main_bp.route('/auth')
 def auth():
     return render_template('auth.html')
+
+@main_bp.route('/clean')
+def clean():
+    return render_template('clean.html')

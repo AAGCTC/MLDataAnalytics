@@ -54,11 +54,19 @@ async function fetchFileHistory() {
     if (!fileSelect) {
         return;
     }
-
+    if (!localStorage.getItem('animeflowUserId')) {
+        showNotification('用户未登录', 'warning');
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '暂无数据文件，请先上传';
+        emptyOption.disabled = true;
+        fileSelect.appendChild(emptyOption);
+        return;
+    }
     try {
-        const response = await fetch('/api/files/history');
+        const response = await fetch(`/api/files/${localStorage.getItem('animeflowUserId')}/history`);
         if (!response.ok) {
-            throw new Error('Failed to fetch file history');
+            showNotification('Failed to fetch file history', 'error');
         }
         const data = await response.json();
 
@@ -359,12 +367,14 @@ async function showFileDetails() {
         }
 
         setPreviewState('loading');
-        const response = await fetch(`/api/files/history/${fileId}/preview?rowCount=${rowCount}`, {
+        const response = await fetch(`/api/files/${localStorage.getItem('animeflowUserId')}/history/${fileId}/preview?rowCount=${rowCount}`, {
             method: 'GET'
         });
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(errorText || 'Failed to fetch file details');
+            showNotification(`加载预览失败: ${errorText || response.statusText}`, 'error');
+            setPreviewState('empty');
+            return;
         }
 
         const data = await response.json();

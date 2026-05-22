@@ -10,7 +10,7 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 最大上传100MB
-
+    CLEANED_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'cleaned')
     # 数据库配置
     SQLALCHEMY_DATABASE_URI = (
         f"mysql+pymysql://{os.getenv('MYSQL_USER')}:{os.getenv('MYSQL_PASSWORD')}"

@@ -637,13 +637,18 @@ async function renderCharts(configs) {
 
 document.addEventListener("DOMContentLoaded", () => {
     // 页面加载时从后端获取历史文件列表
-    fetch("/api/files/history").then((response) => response.json()).then((data) => {
-        analysisFiles = data.data || [];
-        setFileOptions(analysisFiles);
-        console.log("历史文件列表已加载:", analysisFiles);
-    }).catch((error) => {
-        console.error("加载历史文件列表失败:", error);
-    });
+    if (!localStorage.getItem('animeflowUserId')) {
+        showNotification('请先登录后再加载文件列表', 'warning');
+        setFileOptions([]); // 显示无文件选项
+    } else {
+        fetch(`/api/files/${localStorage.getItem('animeflowUserId')}/history`).then((response) => response.json()).then((data) => {
+            analysisFiles = data.data || [];
+            setFileOptions(analysisFiles);
+            console.log("历史文件列表已加载:", analysisFiles);
+        }).catch((error) => {
+            console.error("加载历史文件列表失败:", error);
+        });
+    }
     $("analysis-file").addEventListener("change", (event) => {
         const fileId = event.target.value;
         const file = analysisFiles.find((f) => String(f.id) === fileId);
