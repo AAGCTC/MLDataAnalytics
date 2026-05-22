@@ -492,10 +492,10 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
 def detect_data_quality(df: pd.DataFrame) -> Dict:
     """
     检测数据质量，返回详细的质量报告
-    
+
     Args:
         df: 数据
-        
+
     Returns:
         质量报告字典
     """
@@ -506,44 +506,57 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
         'null_data': [],
         'outlier_headers': [],
         'outlier_data': [],
+        'duplicate_rows': 0,
+        'duplicate_data': [],
         'null_rows': 0,
         'outlier_rows': 0,
         'effective_rows': 0,
         'quality_score': 0.0
     }
-    
+
+    # 检测重复行（优先级最高）
+    duplicate_mask = df.duplicated()
+    duplicate_rows = df[duplicate_mask]
+    report['duplicate_rows'] = len(duplicate_rows)
+    if len(duplicate_rows) > 0:
+        report['outlier_headers'] = list(df.columns)
+        report['outlier_data'] = duplicate_rows.fillna('').head(20).values.tolist()
+        report['duplicate_data'] = duplicate_rows.fillna('').head(20).values.tolist()
+
+    # 先去除重复行，只取其中一条
+    df_unique = df.drop_duplicates()
+
     # 找出含有空值的行
-    null_mask = df.isnull().any(axis=1)
-    null_rows = df[null_mask]
+    null_mask = df_unique.isnull().any(axis=1)
+    null_rows = df_unique[null_mask]
     report['null_rows'] = len(null_rows)
     if len(null_rows) > 0:
         report['null_headers'] = list(df.columns)
-        # 处理 NaN 值，将其转换为空字符串以便 JSON 序列化
         report['null_data'] = null_rows.fillna('').head(20).values.tolist()
-    
-    # 检测异常值
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    # 排除 ID 列（年份、月份、版本等）
+
+    # 检测异常值（使用去重后的数据）
+    numeric_cols = df_unique.select_dtypes(include=[np.number]).columns.tolist()
     id_columns = ['年份', '月份', '版本', 'id', 'ID', 'Id', 'no', 'No', 'NO', 'number', 'Number']
     business_numeric_cols = [col for col in numeric_cols if col not in id_columns]
-    
+
     if len(business_numeric_cols) > 0:
-        df_outliers = detect_outliers(df, columns=business_numeric_cols)
+        df_outliers = detect_outliers(df_unique, columns=business_numeric_cols)
         outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
         if outlier_cols:
             any_outlier = df_outliers[outlier_cols].any(axis=1)
-            outlier_rows = df[any_outlier]
+            outlier_rows = df_outliers[any_outlier]
             report['outlier_rows'] = len(outlier_rows)
             if len(outlier_rows) > 0:
-                report['outlier_headers'] = list(df.columns)
-                # 处理 NaN 值，将其转换为空字符串以便 JSON 序列化
-                report['outlier_data'] = outlier_rows.fillna('').head(20).values.tolist()
-    
-    # 计算有效行数和质量分数
-    report['effective_rows'] = report['total_rows'] - report['null_rows'] - report['outlier_rows']
-    if report['total_rows'] > 0:
-        report['quality_score'] = round(report['effective_rows'] / report['total_rows'] * 100, 1)
+                if report['outlier_data'] == []:
+                    report['outlier_headers'] = list(df.columns)
+                    report['outlier_data'] = outlier_rows.fillna('').head(20).values.tolist()
+
+    # 计算有效行数（使用去重后的总行数减去空值行和异常行）
+    unique_rows = len(df_unique)
+    report['effective_rows'] = unique_rows - report['null_rows'] - report['outlier_rows']
+    if unique_rows > 0:
+        report['quality_score'] = round(report['effective_rows'] / unique_rows * 100, 1)
     else:
         report['quality_score'] = 0.0
-    
+
     return report
