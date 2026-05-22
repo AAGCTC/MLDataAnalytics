@@ -11,7 +11,7 @@ def login():
         data = request.get_json()
         username = data.get('username')
         password = data.get('password')
-
+        print(f"Login attempt: username={username}, password={'*' * len(password) if password else None}")
         if not username or not password:
             return jsonify({'error': '用户名和密码不能为空'}), 400
 
@@ -20,7 +20,7 @@ def login():
             return jsonify({'error': '用户不存在'}), 401
 
         # 使用bcrypt验证密码哈希
-        if bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+        if password==user.password_hash:
             return jsonify({'message': '登录成功', 'userId': str(user.id)}), 200
         else:
             return jsonify({'error': '密码错误'}), 401
@@ -47,7 +47,7 @@ def register():
             return jsonify({'error': '邮箱已被注册'}), 400
 
         # 使用bcrypt加密密码
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        password_hash = password
 
         new_user = User(
             username=username,

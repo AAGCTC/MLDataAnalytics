@@ -540,7 +540,7 @@ body.sidebar-collapsed .nav-link {
 
 .table-scroll {
     overflow: auto;
-    height: 520px;
+    height: 780px;
     max-height: 70vh;
     max-width: 100%;
     min-width: 0;
