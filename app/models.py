@@ -12,6 +12,8 @@ class File(db.Model):
     file_size = db.Column(db.BigInteger, nullable=False, comment='文件大小(字节)')
     mime_type = db.Column(db.String(100), nullable=False, comment='MIME类型')
     file_path = db.Column(db.String(500), nullable=False, comment='文件存储路径')
+    is_cleaned = db.Column(db.Boolean, default=False, comment='是否已清洗')
+    cleaned_path = db.Column(db.String(500), nullable=True, comment='清洗后文件存储路径')
     total_rows = db.Column(db.Integer, default=0, comment='数据总行数')
     total_columns = db.Column(db.Integer, default=0, comment='数据总列数')
     upload_time = db.Column(db.DateTime, default=datetime.now, comment='上传时间')

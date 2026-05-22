@@ -103,9 +103,14 @@ function initHistoryPage() {
 
     const loadHistory = async () => {
         try {
-            const response = await fetch('/api/files/history');
+            if (!localStorage.getItem('animeflowUserId')) {
+                showNotification('用户未登录', 'warning');
+                return;
+            }
+            const response = await fetch(`/api/files/${localStorage.getItem('animeflowUserId')}/history`);
             if (!response.ok) {
-                throw new Error('Failed to fetch file history');
+                showNotification('Failed to fetch file history', 'error');
+                return;
             }
             const data = await response.json();
             const files = Array.isArray(data.data) ? data.data : [];
