@@ -36,6 +36,26 @@ def get_file_row_count(file_path: str) -> int:
     return row_count
 
 
+def read_file_with_stats(file_path: str, encoding: str = None) -> Tuple[pd.DataFrame, int, int]:
+    """
+    读取文件并返回数据、数据行数和列数
+    
+    Args:
+        file_path: 文件路径
+        encoding: 文件编码（可选）
+        
+    Returns:
+        (DataFrame, 数据行数, 列数)
+    """
+    if encoding:
+        df = pd.read_csv(file_path, encoding=encoding)
+    else:
+        df = pd.read_csv(file_path)
+    
+    # 返回DataFrame、数据行数（不含表头）和列数
+    return df, int(df.shape[0]), int(df.shape[1])
+
+
 def drop_missing_values(df: pd.DataFrame,
                         axis: int = 0,
                         thresh: Optional[int] = None) -> pd.DataFrame:
@@ -90,7 +110,8 @@ def fill_missing_values(df: pd.DataFrame,
             elif method == 'constant':
                 fill_val = value if value is not None else 0
                 # 如果指定的值是 NaN 或无穷大，使用 0 填充
-                if pd.isna(fill_val) or not np.isfinite(fill_val):
+                # 只对数值类型进行 np.isfinite 检查
+                if pd.isna(fill_val) or (isinstance(fill_val, (int, float, np.number)) and not np.isfinite(fill_val)):
                     fill_val = 0
             else:
                 continue
@@ -517,8 +538,9 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
     # 检测重复行（优先级最高）
     duplicate_mask = df.duplicated()
     duplicate_rows = df[duplicate_mask]
-    report['duplicate_rows'] = len(duplicate_rows)
-    if len(duplicate_rows) > 0:
+    duplicate_count = len(duplicate_rows)
+    report['duplicate_rows'] = duplicate_count
+    if duplicate_count > 0:
         report['outlier_headers'] = list(df.columns)
         report['outlier_data'] = duplicate_rows.fillna('').head(20).values.tolist()
         report['duplicate_data'] = duplicate_rows.fillna('').head(20).values.tolist()
@@ -526,7 +548,7 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
     # 先去除重复行，只取其中一条
     df_unique = df.drop_duplicates()
 
-    # 找出含有空值的行
+    # 找出含有空值的行（只在空值行中显示，不混入异常值）
     null_mask = df_unique.isnull().any(axis=1)
     null_rows = df_unique[null_mask]
     report['null_rows'] = len(null_rows)
@@ -534,26 +556,35 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
         report['null_headers'] = list(df.columns)
         report['null_data'] = null_rows.fillna('').head(20).values.tolist()
 
-    # 检测异常值（使用去重后的数据）
-    numeric_cols = df_unique.select_dtypes(include=[np.number]).columns.tolist()
+    # 检测数值异常值（排除空值行，确保空值行不在异常行中显示）
+    df_no_null = df_unique[~null_mask]
+    numeric_cols = df_no_null.select_dtypes(include=[np.number]).columns.tolist()
     id_columns = ['年份', '月份', '版本', 'id', 'ID', 'Id', 'no', 'No', 'NO', 'number', 'Number']
     business_numeric_cols = [col for col in numeric_cols if col not in id_columns]
 
+    numeric_outlier_count = 0
     if len(business_numeric_cols) > 0:
-        df_outliers = detect_outliers(df_unique, columns=business_numeric_cols)
+        df_outliers = detect_outliers(df_no_null, columns=business_numeric_cols)
         outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
         if outlier_cols:
             any_outlier = df_outliers[outlier_cols].any(axis=1)
-            outlier_rows = df_outliers[any_outlier]
-            report['outlier_rows'] = len(outlier_rows)
-            if len(outlier_rows) > 0:
+            # 只返回原始数据列，不包含检测标记列
+            outlier_rows = df_no_null[any_outlier]
+            numeric_outlier_count = len(outlier_rows)
+            if numeric_outlier_count > 0:
                 if report['outlier_data'] == []:
                     report['outlier_headers'] = list(df.columns)
                     report['outlier_data'] = outlier_rows.fillna('').head(20).values.tolist()
+                else:
+                    outlier_data_list = outlier_rows.fillna('').head(20).values.tolist()
+                    report['outlier_data'].extend(outlier_data_list)
 
-    # 计算有效行数（使用去重后的总行数减去空值行和异常行）
+    # 异常值行数 = 重复行数 + 数值异常值行数（不包含空值行）
+    report['outlier_rows'] = duplicate_count + numeric_outlier_count
+
+    # 计算有效行数（去重后 - 空值行 - 数值异常行）
     unique_rows = len(df_unique)
-    report['effective_rows'] = unique_rows - report['null_rows'] - report['outlier_rows']
+    report['effective_rows'] = unique_rows - report['null_rows'] - numeric_outlier_count
     if unique_rows > 0:
         report['quality_score'] = round(report['effective_rows'] / unique_rows * 100, 1)
     else:
