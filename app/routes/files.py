@@ -64,7 +64,7 @@ def upload_file():
         existing_files = db.session.query(File.id).filter(File.id.in_(user_fileIds), func.SUBSTRING_INDEX(File.save_name, '_', 1) == file.filename.split('.')[0]).all()
         print(f"Existing files with same original name: {existing_files}")
         if existing_files:
-            original_name=original_name+'_'+str(len(existing_files)+1)
+            original_name=file.filename.rsplit('.', 1)[0] + '_' + str(len(existing_files)+1) + '.' + file.filename.rsplit('.', 1)[1]
 
     # 保存文件记录到数据库
     new_file = File(
