@@ -39,7 +39,7 @@ def get_file_row_count(file_path: str) -> int:
 def read_file_with_stats(file_path: str, encoding: str = None) -> Tuple[pd.DataFrame, int, int]:
     """
     读取文件并返回数据、数据行数和列数
-    
+
     Args:
         file_path: 文件路径
         encoding: 文件编码（可选）
@@ -449,9 +449,7 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
         before_outlier_count = 0
         # 获取所有数值列
         numeric_cols = df_copy.select_dtypes(include=[np.number]).columns.tolist()
-        # 排除 ID 列（年份、月份、版本等）
-        id_columns = ['年份', '月份', '版本', 'id', 'ID', 'Id', 'no', 'No', 'NO', 'number', 'Number']
-        business_numeric_cols = [col for col in numeric_cols if col not in id_columns]
+        business_numeric_cols = [col for col in numeric_cols]
         
         if len(business_numeric_cols) > 0:
             df_outliers = detect_outliers(df_copy, columns=business_numeric_cols)
