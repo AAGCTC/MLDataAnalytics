@@ -4,38 +4,7 @@ from typing import Optional, List, Tuple, Union, Dict
 import os
 
 
-def read_csv_file(file_path: str) -> Tuple[pd.DataFrame, int]:
-    """
-    读取CSV文件并返回数据和总行数（包含数据行，不含表头）
-    
-    Args:
-        file_path: 文件路径
-        
-    Returns:
-        (DataFrame, 数据行数)
-    """
-    df = pd.read_csv(file_path)
-    # 返回DataFrame和数据行数（不包括表头行）
-    return df, len(df)
-
-
-def get_file_row_count(file_path: str) -> int:
-    """
-    获取CSV文件的总行数（包括表头行和所有数据行）
-    
-    Args:
-        file_path: 文件路径
-        
-    Returns:
-        总行数（表头 + 数据行）
-    """
-    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-        lines = f.readlines()
-    # 统计非空行
-    row_count = sum(1 for line in lines if line.strip())
-    return row_count
-
-
+# 读取CSV文件，返回数据DataFrame、数据行数和列数
 def read_file_with_stats(file_path: str, encoding: str = None) -> Tuple[pd.DataFrame, int, int]:
     """
     读取文件并返回数据、数据行数和列数
@@ -56,6 +25,7 @@ def read_file_with_stats(file_path: str, encoding: str = None) -> Tuple[pd.DataF
     return df, int(df.shape[0]), int(df.shape[1])
 
 
+# 删除含有空值的行或列
 def drop_missing_values(df: pd.DataFrame,
                         axis: int = 0,
                         thresh: Optional[int] = None) -> pd.DataFrame:
@@ -64,6 +34,7 @@ def drop_missing_values(df: pd.DataFrame,
     return df.dropna(axis=axis, thresh=thresh)
 
 
+# 填充空值，支持均值、中位数、众数、固定值、前向填充、后向填充
 def fill_missing_values(df: pd.DataFrame,
                         method: str = 'mean',
                         columns: Optional[List[str]] = None,
@@ -131,12 +102,14 @@ def fill_missing_values(df: pd.DataFrame,
     return df_copy
 
 
+# 删除重复行，默认保留第一条
 def remove_duplicates(df: pd.DataFrame,
                       subset: Optional[List[str]] = None,
                       keep: str = 'first') -> pd.DataFrame:
     return df.drop_duplicates(subset=subset, keep=keep)
 
 
+# 检测数值列中的异常值，使用IQR或Z-score方法，返回带检测标记列的DataFrame
 def detect_outliers(df: pd.DataFrame,
                     columns: Optional[List[str]] = None,
                     method: str = 'iqr',
@@ -173,6 +146,7 @@ def detect_outliers(df: pd.DataFrame,
     return df_copy
 
 
+# 删除含有异常值的行
 def remove_outliers(df: pd.DataFrame,
                     columns: Optional[List[str]] = None,
                     method: str = 'iqr',
@@ -213,6 +187,7 @@ def remove_outliers(df: pd.DataFrame,
     return df_copy.drop(index=list(outlier_indices))
 
 
+# 处理异常值，支持删除、替换为中位数、盖帽法
 def handle_outliers(df: pd.DataFrame,
                     columns: Optional[List[str]] = None,
                     method: str = 'iqr',
@@ -265,127 +240,7 @@ def handle_outliers(df: pd.DataFrame,
     return df_copy
 
 
-def standardize_data(df: pd.DataFrame,
-                     columns: Optional[List[str]] = None) -> pd.DataFrame:
-    df_copy = df.copy()
-
-    if columns is None:
-        columns = df_copy.select_dtypes(include=[np.number]).columns
-
-    numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
-
-    for col in numeric_cols:
-        mean = df_copy[col].mean()
-        std = df_copy[col].std()
-        if std != 0:
-            df_copy[col] = (df_copy[col] - mean) / std
-        else:
-            df_copy[col] = 0  # 全相同值，标准化为0
-    return df_copy
-
-
-def normalize_data(df: pd.DataFrame,
-                   columns: Optional[List[str]] = None,
-                   method: str = 'minmax') -> pd.DataFrame:
-    df_copy = df.copy()
-
-    if columns is None:
-        columns = df_copy.select_dtypes(include=[np.number]).columns
-
-    numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
-
-    for col in numeric_cols:
-        if method == 'minmax':
-            min_val = df_copy[col].min()
-            max_val = df_copy[col].max()
-            if max_val != min_val:
-                df_copy[col] = (df_copy[col] - min_val) / (max_val - min_val)
-            else:
-                df_copy[col] = 0
-        elif method == 'maxabs':
-            max_abs = df_copy[col].abs().max()
-            if max_abs != 0:
-                df_copy[col] = df_copy[col] / max_abs
-            else:
-                df_copy[col] = 0
-    return df_copy
-
-
-def convert_dtypes(df: pd.DataFrame,
-                   conversions: Optional[dict] = None) -> pd.DataFrame:
-    df_copy = df.copy()
-    if conversions is None:
-        return df_copy.convert_dtypes()
-    for col, dtype in conversions.items():
-        if col in df_copy.columns:
-            df_copy[col] = df_copy[col].astype(dtype)
-    return df_copy
-
-
-def trim_string_columns(df: pd.DataFrame,
-                        columns: Optional[List[str]] = None) -> pd.DataFrame:
-    df_copy = df.copy()
-    if columns is None:
-        columns = df_copy.select_dtypes(include=['object', 'string']).columns
-    for col in columns:
-        df_copy[col] = df_copy[col].astype(str).str.strip()
-    return df_copy
-
-
-def remove_special_characters(df: pd.DataFrame,
-                              columns: Optional[List[str]] = None,
-                              pattern: str = r'[^a-zA-Z0-9\u4e00-\u9fa5\s]') -> pd.DataFrame:
-    df_copy = df.copy()
-    if columns is None:
-        columns = df_copy.select_dtypes(include=['object', 'string']).columns
-    for col in columns:
-        df_copy[col] = df_copy[col].astype(str).str.replace(pattern, '', regex=True)
-    return df_copy
-
-
-def filter_by_condition(df: pd.DataFrame,
-                        conditions: List[Tuple[str, str, Union[int, float, str]]]) -> pd.DataFrame:
-    df_copy = df.copy()
-    mask = pd.Series([True] * len(df_copy))
-
-    for col, op, val in conditions:
-        if col not in df_copy.columns:
-            continue
-
-        if op == '==':
-            mask &= df_copy[col] == val
-        elif op == '!=':
-            mask &= df_copy[col] != val
-        elif op == '>':
-            mask &= df_copy[col] > val
-        elif op == '<':
-            mask &= df_copy[col] < val
-        elif op == '>=':
-            mask &= df_copy[col] >= val
-        elif op == '<=':
-            mask &= df_copy[col] <= val
-        elif op == 'in':
-            mask &= df_copy[col].isin(val)
-        elif op == 'not in':
-            mask &= ~df_copy[col].isin(val)
-        elif op == 'contains':
-            # 只对字符串列安全执行
-            if df_copy[col].dtype == 'object' or df_copy[col].dtype == 'string':
-                mask &= df_copy[col].str.contains(val, na=False)
-    return df_copy[mask]
-
-
-def get_data_summary(df: pd.DataFrame) -> pd.DataFrame:
-    summary = pd.DataFrame({
-        '列名': df.columns,
-        '数据类型': df.dtypes.values,
-        '非空值数量': df.notnull().sum().values,
-        '空值数量': df.isnull().sum().values,
-        '空值比例': (df.isnull().sum() / len(df)).round(4).values
-    })
-    return summary
-
-
+# 根据规则清洗数据：处理重复行、空值、异常值，返回清洗后的数据和统计信息
 def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Dict]:
     """
     根据规则清洗数据，并返回清洗后的结果和统计信息
@@ -508,6 +363,7 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
     return df_copy, stats
 
 
+# 检测数据质量：统计重复行、空值行、异常值行，计算有效行数和质量分数
 def detect_data_quality(df: pd.DataFrame) -> Dict:
     """
     检测数据质量，返回详细的质量报告
