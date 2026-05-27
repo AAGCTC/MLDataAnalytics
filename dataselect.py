@@ -413,8 +413,7 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
     # 检测数值异常值（排除空值行，确保空值行不在异常行中显示）
     df_no_null = df_unique[~null_mask]
     numeric_cols = df_no_null.select_dtypes(include=[np.number]).columns.tolist()
-    id_columns = ['年份', '月份', '版本', 'id', 'ID', 'Id', 'no', 'No', 'NO', 'number', 'Number']
-    business_numeric_cols = [col for col in numeric_cols if col not in id_columns]
+    business_numeric_cols = [col for col in numeric_cols]
 
     numeric_outlier_count = 0
     if len(business_numeric_cols) > 0:
