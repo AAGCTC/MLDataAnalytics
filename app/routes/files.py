@@ -292,15 +292,21 @@ def detect_file(file_id):
     if file_id not in user_fileIds:
         return jsonify({'error': 'file does not belong to user'}), 403
     
-    # 读取文件内容
+    # 读取文件内容（使用 dataselect.py 中的函数）
     file_path = os.path.join(current_app.root_path, '..', file_record.file_path)
     try:
         with open(file_path, 'rb') as f:
             encoding = chardet.detect(f.read())['encoding']
-        df = pd.read_csv(file_path, encoding=encoding)
+        # 使用 dataselect.py 中的函数读取文件并获取统计信息
+        df, total_rows, total_columns = dataselect.read_file_with_stats(file_path, encoding)
     except Exception as e:
         current_app.logger.error(f"Failed to read file: {e}")
         return jsonify({'error': 'failed to read file'}), 500
+    
+    # 更新数据库中的总行数（确保准确性）
+    file_record.total_rows = total_rows
+    file_record.total_columns = total_columns
+    db.session.commit()
     
     # 使用 dataselect.py 进行数据质量检测
     quality_report = dataselect.detect_data_quality(df)
