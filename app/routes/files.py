@@ -7,6 +7,9 @@ from werkzeug.utils import secure_filename
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from app.models import db, File,UserFiles
 from urllib.parse import quote
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+import dataselect
 
 files_bp = Blueprint('files', __name__, url_prefix='/api/files')
 
@@ -184,35 +187,35 @@ def detect_file(file_id):
     if file_id not in user_fileIds:
         return jsonify({'error': 'file does not belong to user'}), 403
     
-    # 这里可以添加实际的文件检测逻辑，统计缺失值、重复行、异常值等信息
-    # fileid可以用来定位文件路径，读取文件内容进行分析
-    # 目前返回的是模拟数据，实际实现时需要根据文件内容进行计算
-    # 返回数据格式示例：
+    # 读取文件内容（使用 dataselect.py 中的函数）
+    file_path = os.path.join(current_app.root_path, '..', file_record.file_path)
+    try:
+        with open(file_path, 'rb') as f:
+            encoding = chardet.detect(f.read())['encoding']
+        # 使用 dataselect.py 中的函数读取文件并获取统计信息
+        df, total_rows, total_columns = dataselect.read_file_with_stats(file_path, encoding)
+    except Exception as e:
+        current_app.logger.error(f"Failed to read file: {e}")
+        return jsonify({'error': 'failed to read file'}), 500
+    
+    # 更新数据库中的总行数（确保准确性）
+    file_record.total_rows = total_rows
+    file_record.total_columns = total_columns
+    db.session.commit()
+    
+    # 使用 dataselect.py 进行数据质量检测
+    quality_report = dataselect.detect_data_quality(df)
+    
     return jsonify({
-        # 文件总行数
-        "totalRows": 1000,
-        # 空值行数
-        "nullRows": 50,
-        # 异常值行数
-        "outlierRows": 20,
-        # 所有列名
-        "nullHeaders": ["id", "name", "score"],
-        # 包含空值的行数据，格式为二维数组，每个子数组表示一行数据
-        "nullData": [[1, "Naruto", None],[2, None, 9.2],[4, "One Piece", None],
-                     [5, None, None],[6, "Dragon Ball", None],[7, None, None],
-                     [8, "Attack on Titan", None],[9, None, 8.9],[10, "My Hero Academia", None],
-                     [11, None, None],[12, "Demon Slayer", None],[13, None, 8.5],
-                     [14, "Jujutsu Kaisen", None],[15, None, None],[16, "Tokyo Revengers", None],
-                     [17, None, 7.8],[18, "Fullmetal Alchemist", None],[19, None, 9.0],
-                     [20, "Death Note", None]],
-        # 包含异常值的行数据，格式同上
-        "outlierHeaders": ["id", "name", "score"],
-        "outlierData": [[3, "Bleach", 15.0],[21, "One Punch Man", 12.0],[22, "Fairy Tail", 14.5],
-                        [23, "Sword Art Online", 13.0],[24, "Black Clover", 16.0],[25, "My Hero Academia", 14.0],
-                        [26, "Demon Slayer", 17.0],[27, "Jujutsu Kaisen", 18.0],[28, "Tokyo Revengers", 19.0],
-                        [29, "Fullmetal Alchemist", 20.0],[30, "Death Note", 21.0]],
-        "effectiveRows": 930,
-        "qualityScore": 93.0
+        "totalRows": quality_report['total_rows'],
+        "nullRows": quality_report['null_rows'],
+        "outlierRows": quality_report['outlier_rows'],
+        "nullHeaders": quality_report['null_headers'],
+        "nullData": quality_report['null_data'],
+        "outlierHeaders": quality_report['outlier_headers'],
+        "outlierData": quality_report['outlier_data'],
+        "effectiveRows": quality_report['effective_rows'],
+        "qualityScore": quality_report['quality_score']
     })
     
 # userId: localStorage.getItem('animeflowUserId'),
@@ -234,25 +237,40 @@ def clean_file(file_id):
     print(f"user_id={user_id}, file_id={file_id}, user_fileIds={user_fileIds}")
     if file_id not in user_fileIds:
         return jsonify({'error': 'file does not belong to user'}), 403
-    # 创建清洗后文件保存目录
+
+    # 读取文件内容
+    file_path = os.path.join(current_app.root_path, '..', file_record.file_path)
+    try:
+        with open(file_path, 'rb') as f:
+            encoding = chardet.detect(f.read())['encoding']
+        df = pd.read_csv(file_path, encoding=encoding)
+    except Exception as e:
+        current_app.logger.error(f"Failed to read file: {e}")
+        return jsonify({'error': 'failed to read file'}), 500
+
+    # 使用 dataselect.py 进行数据清洗
+    df_cleaned, stats = dataselect.clean_data_by_rules(df, rules)
+
+    # 保存清洗后的文件
     cleaned_dir = os.path.join(current_app.config['CLEANED_FOLDER'], str(user_id))
     os.makedirs(cleaned_dir, exist_ok=True)
+    cleaned_file_path = os.path.join(cleaned_dir, f"cleaned_{file_record.save_name}")
+    df_cleaned.to_csv(cleaned_file_path, index=False, encoding='utf-8')
+
+    # 更新文件记录
     file_record.is_cleaned = True
     file_record.cleaned_path = os.path.join('cleaned', str(user_id), f"cleaned_{file_record.save_name}")
     db.session.commit()
-    # 这里可以添加实际的文件清洗逻辑，根据传入的规则进行数据清洗
-    # fileid可以用来定位文件路径，读取文件内容进行清洗处理  
-    # 目前返回的是模拟数据，实际实现时需要根据文件内容和清洗规则进行处理
-    # 返回数据格式示例：
+
     return jsonify({
         "success": True,
-        "cleanedFileId": file_record.id,  # 清洗后文件的ID，前端可以用这个ID来下载清洗后的文件
+        "cleanedFileId": file_record.id,
         "summary": {
-            "originalRows": 1000,
-            "cleanedRows": 920,
-            "deletedNulls": 50,
-            "handledOutliers": 20,
-            "deletedDuplicates": 10
+            "originalRows": stats['original_rows'],
+            "cleanedRows": stats['cleaned_rows'],
+            "deletedNulls": stats['deleted_nulls'],
+            "handledOutliers": stats['handled_outliers'],
+            "deletedDuplicates": stats['deleted_duplicates']
         }
     })
     
@@ -290,8 +308,9 @@ def download_file(file_id):
         file_path = file.file_path
         
     # 5. 检查文件是否实际存在于服务器
-    if not os.path.exists(file_path) or not os.path.isfile(file_path):
-        print(f"File path {file_path} does not exist or is not a file")
+    full_file_path = os.path.join(os.getcwd(), file_path)
+    if not os.path.exists(full_file_path) or not os.path.isfile(full_file_path):
+        print(f"File path {full_file_path} does not exist or is not a file")
         return jsonify({'error': '文件已损坏或不存在'}), 404
 
     try:
@@ -306,7 +325,7 @@ def download_file(file_id):
         from flask import send_file
         
         response = send_file(
-            path_or_file=os.path.join(os.getcwd(), file_path),
+            path_or_file=full_file_path,
             as_attachment=True,
             mimetype='text/csv'  # 明确指定CSV文件的MIME类型
         )

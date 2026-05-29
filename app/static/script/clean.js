@@ -128,16 +128,19 @@ function UpdateDetectResult(result){
     const outlierRows = result.outlierRows || 0;
     const validRows = result.effectiveRows || 0;
     const qualityScore = Math.round(result.qualityScore || 0);
-    
+
+    // 更新总行数显示（确保与数据预览一致）
+    document.getElementById('clean-rows').textContent = totalRows;
+
     document.getElementById('null-count').textContent = nullRows;
     document.getElementById('null-percent').textContent = `(${(nullRows/totalRows*100).toFixed(1)}%)`;
-    
+
     document.getElementById('outlier-count').textContent = outlierRows;
     document.getElementById('outlier-percent').textContent = `(${(outlierRows/totalRows*100).toFixed(1)}%)`;
-    
+
     document.getElementById('valid-count').textContent = validRows;
     document.getElementById('valid-percent').textContent = `(${(validRows/totalRows*100).toFixed(1)}%)`;
-    
+
     document.getElementById('data-quality').textContent = `${qualityScore}%`;
     document.getElementById('quality-fill').style.width = `${qualityScore}%`;
 
