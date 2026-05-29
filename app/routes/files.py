@@ -2,6 +2,7 @@ import os
 import chardet
 import pandas as pd
 from datetime import datetime
+from sqlalchemy import func
 from werkzeug.utils import secure_filename
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from app.models import db, File,UserFiles
@@ -25,7 +26,9 @@ def upload_file():
     os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
     user_upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], str(user_id))
     os.makedirs(user_upload_dir, exist_ok=True)
-    filename = secure_filename(file.filename)
+    # filename唯一
+    filename = secure_filename(file.filename.split('.')[0] + "_" + user_id + "_" + datetime.now().strftime("%Y%m%d%H%M%S") + "." + file.filename.split('.')[-1])
+    # save_path唯一
     save_path = os.path.join(user_upload_dir, filename)
     file.save(save_path)
 
@@ -49,10 +52,23 @@ def upload_file():
             total_columns = int(df.shape[1])
     except Exception as e:
         current_app.logger.warning(f"Failed to parse file stats: {e}")
+    
+    #original_name唯一
+    original_name = file.filename
+    # 判断数据库中是否有同名文件，如果有则在文件名后添加时间戳避免冲突
+    user_fileIds = db.session.query(UserFiles.file_id).filter_by(user_id=user_id).all()
+    user_fileIds = [fid for (fid,) in user_fileIds] 
+    existing_files=[]
+    print(f"user_id={user_id}, user_fileIds={user_fileIds}")
+    if user_fileIds:
+        existing_files = db.session.query(File.id).filter(File.id.in_(user_fileIds), func.SUBSTRING_INDEX(File.save_name, '_', 1) == file.filename.split('.')[0]).all()
+        print(f"Existing files with same original name: {existing_files}")
+        if existing_files:
+            original_name=file.filename.rsplit('.', 1)[0] + '_' + str(len(existing_files)+1) + '.' + file.filename.rsplit('.', 1)[1]
 
     # 保存文件记录到数据库
     new_file = File(
-        original_name=file.filename,
+        original_name=original_name,
         save_name=filename,
         file_size=os.path.getsize(save_path),
         mime_type=file.mimetype,
@@ -66,8 +82,8 @@ def upload_file():
     db.session.add(user_file)
     db.session.commit()
     return jsonify({
-        'message': 'uploaded',
-        'filename': filename,
+        'message': 'uploaded' if not existing_files else 'conflict',
+        'filename': original_name,
         'fileId': new_file.id
     }), 200
 
