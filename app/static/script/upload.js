@@ -122,7 +122,20 @@ function initFileUpload() {
                 startCountdown(3, redirectUrl);
                 return;
             }
-            throw new Error('上传失败');
+            else if (responseData.message === 'conflict') {
+                updateProgress(100);
+                setUploadState('success');
+                if (responseData.filename) {
+                    console.log('File conflict detected. Server renamed the file to:', responseData.filename);
+                    showNotification(`文件已存在，已为您重新命名为 ${responseData.filename} 并上传成功`, 'info');
+                }
+                const redirectUrl = responseData.fileId
+                    ? `/preview?fileId=${encodeURIComponent(responseData.fileId)}`
+                    : '/preview';
+                startCountdown(3, redirectUrl);
+                return;
+            }
+            showNotification('上传失败');
         } catch (error) {
             notify('上传失败：' + error.message, 'error');
             console.error('Error uploading file:', error);
