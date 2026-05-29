@@ -16,10 +16,18 @@ def read_file_with_stats(file_path: str, encoding: str = None) -> Tuple[pd.DataF
     Returns:
         (DataFrame, 数据行数, 列数)
     """
-    if encoding:
-        df = pd.read_csv(file_path, encoding=encoding)
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in ['.csv', '.txt']:
+        if encoding:
+            df = pd.read_csv(file_path, encoding=encoding)
+        else:
+            df = pd.read_csv(file_path)
+    elif ext in ['.xlsx', '.xls']:
+        df = pd.read_excel(file_path)
+    elif ext in ['.json']:
+        df = pd.read_json(file_path)
     else:
-        df = pd.read_csv(file_path)
+        raise ValueError('unsupported file type')
     
     # 返回DataFrame、数据行数（不含表头）和列数
     return df, int(df.shape[0]), int(df.shape[1])

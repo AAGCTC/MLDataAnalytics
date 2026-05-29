@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from app.models import db, File, UserFiles
 from app.utils import load_dataframe, build_line_payload, build_distribution_payload, build_scatter_payload, build_radar_payload
 from app.ml_algorithm import DataAnalyzer
-from app.visualization import build_bar_payload, build_line_area_payload, build_pie_payload, build_scatter_payload as build_scatter_chart_payload, build_radar_payload as build_radar_chart_payload
+from app.visualization import build_bar_payload, build_line_area_payload, build_pie_payload, build_scatter_payload as build_scatter_chart_payload, build_radar_payload as build_radar_chart_payload, mlVisualization
 from urllib.parse import quote
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -113,9 +113,7 @@ def get_file_preview(user_id, file_id):
 
     file_path = os.path.join(current_app.root_path, '..', file_record.file_path)
     try:
-        with open(file_path, 'rb') as f:
-            encoding = chardet.detect(f.read())['encoding']
-        df = pd.read_csv(file_path, encoding=encoding)
+        df = load_dataframe(file_path)
 
         columns = df.columns.tolist()
         missing_count = int(df.replace('', pd.NA).isna().sum().sum())
@@ -160,8 +158,10 @@ def get_file_preview(user_id, file_id):
 def Visualization(user_id, file_id):
     request_data = request.get_json()
     chartsconfig = request_data.get('chartConfig')
-    if not chartsconfig:
-        return jsonify({'error': 'missing chartConfig'}), 400
+    mlconfig = request_data.get('mlConfig', [])
+    
+    if not chartsconfig and not mlconfig:
+        return jsonify({'error': 'missing chartConfig and mlConfig'}), 400
 
     file_record = db.session.get(File, file_id)
     if not file_record:
@@ -209,7 +209,10 @@ def Visualization(user_id, file_id):
             if chart_data:
                 result.append(chart_data)
 
-    return jsonify({'success': True, 'data': result})
+    ml_result = mlVisualization(df, mlconfig)
+    result.extend(ml_result)
+
+    return jsonify({'success': True, 'data': result, 'mlData': ml_result})
 
 
 # 分析接口 - 执行数据分析并返回图表数据
@@ -346,9 +349,7 @@ def clean_file(file_id):
     # 读取文件内容
     file_path = os.path.join(current_app.root_path, '..', file_record.file_path)
     try:
-        with open(file_path, 'rb') as f:
-            encoding = chardet.detect(f.read())['encoding']
-        df = pd.read_csv(file_path, encoding=encoding)
+        df = load_dataframe(file_path)
     except Exception as e:
         current_app.logger.error(f"Failed to read file: {e}")
         return jsonify({'error': 'failed to read file'}), 500
@@ -360,7 +361,17 @@ def clean_file(file_id):
     cleaned_dir = os.path.join(current_app.config['CLEANED_FOLDER'], str(user_id))
     os.makedirs(cleaned_dir, exist_ok=True)
     cleaned_file_path = os.path.join(cleaned_dir, f"cleaned_{file_record.save_name}")
-    df_cleaned.to_csv(cleaned_file_path, index=False, encoding='utf-8')
+    
+    # 根据文件扩展名保存
+    ext = os.path.splitext(cleaned_file_path)[1].lower()
+    if ext in ['.csv', '.txt']:
+        df_cleaned.to_csv(cleaned_file_path, index=False, encoding='utf-8')
+    elif ext in ['.xlsx', '.xls']:
+        df_cleaned.to_excel(cleaned_file_path, index=False)
+    elif ext in ['.json']:
+        df_cleaned.to_json(cleaned_file_path, orient='records', force_ascii=False)
+    else:
+        df_cleaned.to_csv(cleaned_file_path, index=False, encoding='utf-8')
 
     # 更新文件记录
     file_record.is_cleaned = True
