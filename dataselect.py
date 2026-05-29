@@ -158,32 +158,18 @@ def remove_outliers(df: pd.DataFrame,
 
     numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
 
-    # 先找出所有异常值的索引
-    outlier_indices = set()
-    for col in numeric_cols:
-        if method == 'iqr':
-            q1 = df_copy[col].quantile(0.25)
-            q3 = df_copy[col].quantile(0.75)
-            iqr = q3 - q1
-            # 如果 IQR 为 0（所有值相同或分布非常集中），跳过该列
-            if iqr == 0:
-                continue
-            lower_bound = q1 - threshold * iqr
-            upper_bound = q3 + threshold * iqr
-            col_outliers = ~df_copy[col].between(lower_bound, upper_bound)
-        elif method == 'zscore':
-            mean = df_copy[col].mean()
-            std = df_copy[col].std()
-            if std == 0:
-                continue
-            z_scores = np.abs((df_copy[col] - mean) / std)
-            col_outliers = z_scores > threshold
-        else:
-            raise ValueError(f"Unknown method: {method}")
-        
-        outlier_indices.update(df_copy[col_outliers].index)
-    
-    # 移除所有异常值行
+    if len(numeric_cols) == 0:
+        return df_copy
+
+    df_outliers = detect_outliers(df_copy, columns=numeric_cols, method=method, threshold=threshold)
+    outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
+
+    if not outlier_cols:
+        return df_copy
+
+    any_outlier = df_outliers[outlier_cols].any(axis=1)
+    outlier_indices = df_outliers[any_outlier].index
+
     return df_copy.drop(index=list(outlier_indices))
 
 
@@ -200,43 +186,47 @@ def handle_outliers(df: pd.DataFrame,
 
     numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
 
-    for col in numeric_cols:
-        if method == 'iqr':
-            q1 = df_copy[col].quantile(0.25)
-            q3 = df_copy[col].quantile(0.75)
-            iqr = q3 - q1
-            lower_bound = q1 - threshold * iqr
-            upper_bound = q3 + threshold * iqr
-            outliers = ~df_copy[col].between(lower_bound, upper_bound)
-        elif method == 'zscore':
-            mean = df_copy[col].mean()
-            std = df_copy[col].std()
-            if std == 0:
-                continue
-            z_scores = np.abs((df_copy[col] - mean) / std)
-            outliers = z_scores > threshold
-        else:
-            raise ValueError(f"Unknown method: {method}")
+    if len(numeric_cols) == 0:
+        return df_copy
 
-        if handle_method == 'remove':
-            # 只记录需要删除的索引，最后统一处理
-            pass
-        elif handle_method == 'replace':
+    if handle_method == 'remove':
+        return remove_outliers(df_copy, columns=numeric_cols, method=method, threshold=threshold)
+
+    df_outliers = detect_outliers(df_copy, columns=numeric_cols, method=method, threshold=threshold)
+    outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
+
+    if not outlier_cols:
+        return df_copy
+
+    any_outlier = df_outliers[outlier_cols].any(axis=1)
+
+    if handle_method == 'replace':
+        for col in numeric_cols:
             median_val = df_copy[col].median()
-            df_copy.loc[outliers, col] = median_val
-        elif handle_method == 'cap':
+            if pd.isna(median_val) or not np.isfinite(median_val):
+                median_val = 0
+            col_outlier_col = f'is_outlier_{col}'
+            if col_outlier_col in df_outliers.columns:
+                df_copy.loc[df_outliers[col_outlier_col], col] = median_val
+    elif handle_method == 'cap':
+        for col in numeric_cols:
             if method == 'iqr':
                 q1 = df_copy[col].quantile(0.25)
                 q3 = df_copy[col].quantile(0.75)
                 iqr = q3 - q1
+                if iqr == 0:
+                    continue
                 lower_bound = q1 - threshold * iqr
                 upper_bound = q3 + threshold * iqr
+            elif method == 'zscore':
+                mean = df_copy[col].mean()
+                std = df_copy[col].std()
+                if std == 0:
+                    continue
+                lower_bound = mean - threshold * std
+                upper_bound = mean + threshold * std
             df_copy[col] = df_copy[col].clip(lower=lower_bound, upper=upper_bound)
-    
-    # 如果是 remove 方法，最后统一删除
-    if handle_method == 'remove':
-        df_copy = remove_outliers(df_copy, columns=columns, method=method, threshold=threshold)
-    
+
     return df_copy
 
 
@@ -322,37 +312,19 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
         elif outlier_rule == 'cap':
             df_copy = handle_outliers(df_copy, columns=business_numeric_cols, handle_method='cap')
             stats['handled_outliers'] = before_outlier_count
-        elif outlier_rule == 'replace-mean':
-            # 使用均值替换异常值（排除异常值后计算均值）
+        elif outlier_rule in ('replace-mean', 'replace-median'):
+            agg_func = pd.DataFrame.mean if outlier_rule == 'replace-mean' else pd.DataFrame.median
             for col in business_numeric_cols:
                 df_outliers = detect_outliers(df_copy, columns=[col])
                 outliers = df_outliers[f'is_outlier_{col}']
                 if outliers.any():
-                    # 排除异常值后计算均值
                     non_outlier_values = df_copy.loc[~outliers, col]
-                    mean_val = non_outlier_values.mean()
-                    if pd.isna(mean_val) or not np.isfinite(mean_val):
-                        mean_val = 0
-                    # 根据列的数据类型转换值
+                    fill_val = agg_func(non_outlier_values)
+                    if pd.isna(fill_val) or not np.isfinite(fill_val):
+                        fill_val = 0
                     if df_copy[col].dtype == np.int64:
-                        mean_val = int(mean_val)
-                    df_copy.loc[outliers, col] = mean_val
-            stats['handled_outliers'] = before_outlier_count
-        elif outlier_rule == 'replace-median':
-            # 使用中位数替换异常值（排除异常值后计算中位数）
-            for col in business_numeric_cols:
-                df_outliers = detect_outliers(df_copy, columns=[col])
-                outliers = df_outliers[f'is_outlier_{col}']
-                if outliers.any():
-                    # 排除异常值后计算中位数
-                    non_outlier_values = df_copy.loc[~outliers, col]
-                    median_val = non_outlier_values.median()
-                    if pd.isna(median_val) or not np.isfinite(median_val):
-                        median_val = 0
-                    # 根据列的数据类型转换值
-                    if df_copy[col].dtype == np.int64:
-                        median_val = int(median_val)
-                    df_copy.loc[outliers, col] = median_val
+                        fill_val = int(fill_val)
+                    df_copy.loc[outliers, col] = fill_val
             stats['handled_outliers'] = before_outlier_count
         else:
             df_copy = handle_outliers(df_copy, columns=business_numeric_cols, handle_method='remove')
