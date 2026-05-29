@@ -401,7 +401,8 @@ async function loadPreview(fileId) {
         return;
     }
     try {
-        const response = await fetch(`/api/files/${localStorage.getItem("animeflowUserId")}/history/${fileId}/preview?rowCount=200`);
+        const userId = localStorage.getItem('animeflowUserId');
+        const response = await fetch(`/api/files/${userId}/history/${fileId}/preview?rowCount=200`);
         if (!response.ok) showNotification("文件加载失败");
         const data = await response.json();
         previewRows = Array.isArray(data.data) ? data.data : [];
@@ -472,10 +473,7 @@ function handleGenerate() {
         });
         return { type, fields };
     });
-    if (!configs.length) {
-        showNotification("请至少添加一个图表", "error");
-        return;
-    }
+    
 
     // 4. 校验：必填字段是否填写
     let isValid = true;
@@ -504,7 +502,10 @@ function handleGenerate() {
         });
         return { type, fields };
     });
-
+    if (!configs.length&&!mlPayload.length) {
+        showNotification("请至少添加一个图表", "error");
+        return;
+    }
     showNotification("正在生成图表...", "info");
     // 5. 显示结果区域，更新状态（模拟处理流程）
     setResultVisible(true);
@@ -717,7 +718,8 @@ async function renderCharts(configs, mlConfig) {
 
     clearCharts();
     try {
-        const response = await fetch(`/api/files/${localStorage.getItem("animeflowUserId")}/history/${$("analysis-file").value}/visualization`, {
+        const userid= localStorage.getItem('animeflowUserId');
+        const response = await fetch(`/api/files/${userid}/history/${$("analysis-file").value}/visualization`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
