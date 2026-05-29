@@ -274,8 +274,7 @@ async function loadPreview(fileId) {
         return;
     }
     try {
-        const userId = localStorage.getItem('animeflowUserId');
-        const response = await fetch(`/api/files/${userId}/history/${fileId}/preview?rowCount=200`);
+        const response = await fetch(`/api/files/history/${fileId}/preview?rowCount=200`);
         if (!response.ok) showNotification("文件加载失败");
         const data = await response.json();
         previewRows = Array.isArray(data.data) ? data.data : [];
@@ -576,8 +575,7 @@ async function renderCharts(configs) {
 
     clearCharts();
     try {
-        const userId = localStorage.getItem('animeflowUserId');
-        const response = await fetch(`/api/files/${userId}/history/${$("analysis-file").value}/visualization`, {
+        const response = await fetch(`/api/files/history/${$("analysis-file").value}/visualization`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"

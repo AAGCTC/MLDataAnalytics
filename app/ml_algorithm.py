@@ -1,12 +1,14 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import r2_score, mean_squared_error, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn.metrics import confusion_matrix
+from sklearn.decomposition import PCA
+
 
 
 class DataAnalyzer:
@@ -24,7 +26,7 @@ class DataAnalyzer:
             'cols': len(self.df.columns)
         }
 
-    # ========== 数据清洗 ==========
+    # ========== 数据清洗 =========
     def get_clean_info(self):
         return {
             'total_rows': len(self.df),
@@ -108,7 +110,11 @@ class DataAnalyzer:
             'r2': round(r2_score(y_test, y_pred), 4),
             'rmse': round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
             'intercept': round(model.intercept_, 4),
-            'coefficients': {col: round(coef, 4) for col, coef in zip(feature_cols, model.coef_)}
+            'coefficients': {col: round(coef, 4) for col, coef in zip(feature_cols, model.coef_)},
+            'scatter_data': {
+                'y_test': y_test.tolist(),
+                'y_pred': y_pred.tolist()
+            }
         }
 
     # ========== 分类预测 ==========
@@ -143,6 +149,8 @@ class DataAnalyzer:
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
 
+        cm = confusion_matrix(y_test, y_pred)
+
         return {
             'success': True,
             'type': 'classification',
@@ -151,7 +159,8 @@ class DataAnalyzer:
             'accuracy': round(accuracy_score(y_test, y_pred), 4),
             'precision': round(precision_score(y_test, y_pred), 4),
             'recall': round(recall_score(y_test, y_pred), 4),
-            'f1': round(f1_score(y_test, y_pred), 4)
+            'f1': round(f1_score(y_test, y_pred), 4),
+            'confusion_matrix': cm.tolist()
         }
 
     # ========== 聚类分析 ==========
@@ -169,13 +178,20 @@ class DataAnalyzer:
 
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         labels = kmeans.fit_predict(X_scaled)
+        pca = PCA(n_components=2, random_state=42)
+        coords_2d = pca.fit_transform(X_scaled)
 
         return {
             'success': True,
             'type': 'clustering',
             'n_clusters': n_clusters,
             'silhouette_score': round(silhouette_score(X_scaled, labels), 4),
-            'cluster_counts': {int(k): int(v) for k, v in zip(*np.unique(labels, return_counts=True))}
+            'cluster_counts': {int(k): int(v) for k, v in zip(*np.unique(labels, return_counts=True))},
+            'scatter_data': {
+                'x': coords_2d[:, 0].tolist(),
+                'y': coords_2d[:, 1].tolist(),
+                'labels': labels.tolist()
+            }
         }
 
 
