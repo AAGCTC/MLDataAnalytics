@@ -26,7 +26,7 @@ class DataAnalyzer:
             'cols': len(self.df.columns)
         }
 
-    # ========== 数据清洗 ==========
+    # ========== 数据清洗 =========
     def get_clean_info(self):
         return {
             'total_rows': len(self.df),
