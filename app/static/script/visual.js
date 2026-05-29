@@ -10,6 +10,8 @@ let numericColumns = [];
 let chartInstances = [];
 let chartCount = 0; // 图表计数器，用于生成唯一ID
 let chartsConfig = []; // 存储当前图表配置数据
+let mlConfigCount = 0; // 机器学习配置计数器
+let mlConfigs = []; // 存储机器学习配置数据
 const chartSchemas = {
     line: { label: "折线图", fields: [{ key: "x", label: "X 轴", type: "any", required: true }, { key: "y", label: "Y 值", type: "numeric", required: true }] },
     area: { label: "面积图", fields: [{ key: "x", label: "X 轴", type: "any", required: true }, { key: "y", label: "Y 值", type: "numeric", required: true }] },
@@ -17,6 +19,12 @@ const chartSchemas = {
     pie: { label: "饼图", fields: [{ key: "label", label: "标签", type: "any", required: true }, { key: "value", label: "数值(可选)", type: "numeric", required: false }] },
     scatter: { label: "散点图", fields: [{ key: "x", label: "X 值", type: "numeric", required: true }, { key: "y", label: "Y 值", type: "numeric", required: true }] },
     radar: { label: "雷达图", fields: [{ key: "label", label: "标签", type: "any", required: true }, { key: "value", label: "数值", type: "numeric", required: true }] }
+};
+
+const mlSchemas = {
+    regression: { label: "回归", targetRequired: true },
+    classification: { label: "分类", targetRequired: true },
+    clustering: { label: "聚类", targetRequired: false }
 };
 
 const chartPalette = ["#4fd1ff", "#f5b544", "#2de2a6", "#fca5a5", "#93c5fd", "#f97316"];
@@ -265,6 +273,125 @@ function renderConfigFields(card) {
     });
 }
 
+// 创建机器学习配置卡片
+function createMlConfigCard(index) {
+    const card = document.createElement("div");
+    card.className = "chart-config ml-config";
+    card.dataset.mlId = `ml-${Date.now()}-${index}`;
+    const mlId = card.dataset.mlId;
+
+    const head = document.createElement("div");
+    head.className = "config-head";
+    const title = document.createElement("div");
+    title.className = "config-title";
+    title.textContent = `模型 ${String(index).padStart(2, "0")}`;
+    const remove = document.createElement("button");
+    remove.className = "config-remove";
+    remove.type = "button";
+    remove.textContent = "移除";
+    remove.addEventListener("click", () => {
+        RemoveMlConfig(mlId);
+        updateMlTitles();
+    });
+    head.appendChild(title);
+    head.appendChild(remove);
+
+    const typeRow = document.createElement("div");
+    typeRow.className = "config-field";
+    const typeLabel = document.createElement("label");
+    typeLabel.textContent = "学习任务";
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "card";
+    Object.keys(mlSchemas).forEach((type) => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = mlSchemas[type].label;
+        typeSelect.appendChild(option);
+    });
+    typeSelect.addEventListener("change", () => {
+        renderMlFields(card);
+    });
+    typeRow.appendChild(typeLabel);
+    typeRow.appendChild(typeSelect);
+
+    const fields = document.createElement("div");
+    fields.className = "config-fields";
+
+    card.appendChild(head);
+    card.appendChild(typeRow);
+    card.appendChild(fields);
+
+    renderMlFields(card);
+    return card;
+}
+
+// 渲染机器学习字段配置
+function renderMlFields(card) {
+    const typeSelect = card.querySelector(".card");
+    const type = typeSelect ? typeSelect.value : "regression";
+    const fieldsContainer = card.querySelector(".config-fields");
+    if (!fieldsContainer) return;
+
+    fieldsContainer.innerHTML = "";
+    const schema = mlSchemas[type] || mlSchemas.regression;
+    const fields = [
+        {
+            key: "target",
+            label: schema.targetRequired ? "目标列" : "目标列(可选)",
+            required: schema.targetRequired
+        },
+        { key: "feature", label: "特征列", required: true }
+    ];
+
+    fields.forEach((field) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "config-field";
+
+        const label = document.createElement("label");
+        label.textContent = field.label;
+
+        const select = document.createElement("select");
+        select.className = "viz-select";
+        select.dataset.field = field.key;
+        populateSelect(select, columnList, !field.required);
+
+        wrapper.appendChild(label);
+        wrapper.appendChild(select);
+        fieldsContainer.appendChild(wrapper);
+    });
+}
+
+// 更新机器学习配置卡片标题
+function updateMlTitles() {
+    const cards = Array.from(document.querySelectorAll(".ml-config"));
+    cards.forEach((card, index) => {
+        const title = card.querySelector(".config-title");
+        if (title) title.textContent = `模型 ${String(index + 1).padStart(2, "0")}`;
+    });
+}
+
+// 移除机器学习配置卡片
+function RemoveMlConfig(mlId) {
+    if (!mlId) {
+        mlConfigs.forEach((c) => c.card.remove());
+        mlConfigs = [];
+        mlConfigCount = 0;
+        const empty = $("ml-config-empty");
+        if (empty) empty.style.display = "block";
+        return;
+    }
+    const card = mlConfigs.find((c) => c.id === mlId);
+    if (card) {
+        card.card.remove();
+        mlConfigs.splice(mlConfigs.indexOf(card), 1);
+        mlConfigCount -= 1;
+    }
+    if (mlConfigCount === 0) {
+        const empty = $("ml-config-empty");
+        if (empty) empty.style.display = "block";
+    }
+}
+
 // 加载文件预览数据（从后端获取前200行数据），并推断数值型字段
 async function loadPreview(fileId) {
     if (!fileId) {
@@ -282,15 +409,18 @@ async function loadPreview(fileId) {
         numericColumns = inferNumericColumns(previewRows, columnList); // 推断数值字段
 
         // 更新所有配置卡片的字段选择框
-        const cards = Array.from(document.querySelectorAll(".chart-config"));
-        cards.forEach((card) => renderConfigFields(card));
+        const chartCards = Array.from(document.querySelectorAll(".chart-config:not(.ml-config)"));
+        chartCards.forEach((card) => renderConfigFields(card));
+
+        const mlCards = Array.from(document.querySelectorAll(".ml-config"));
+        mlCards.forEach((card) => renderMlFields(card));
     } catch (error) {
         showNotification(error.message, "error");
     }
 }
 // 更新所有配置卡片的标题（如「图表 01」、「图表 02」...）
 function updateConfigTitles() {
-    const cards = Array.from(document.querySelectorAll(".chart-config"));
+    const cards = Array.from(document.querySelectorAll(".chart-config:not(.ml-config)"));
     cards.forEach((card, index) => {
         const title = card.querySelector(".config-title");
         if (title) title.textContent = `图表 ${String(index + 1).padStart(2, "0")}`;
@@ -363,6 +493,18 @@ function handleGenerate() {
         showNotification("请补全必选字段", "error");
         return;
     }
+    const mlPayload = mlConfigs.map((c) => {
+        const type = c.card.querySelector(".card").value;
+        const fieldSelects = c.card.querySelectorAll(".viz-select");
+        const fields = {};
+        fieldSelects.forEach((select) => {
+            const key = select.dataset.field;
+            const value = select.value;
+            if (value) fields[key] = value;
+        });
+        return { type, fields };
+    });
+
     showNotification("正在生成图表...", "info");
     // 5. 显示结果区域，更新状态（模拟处理流程）
     setResultVisible(true);
@@ -371,7 +513,7 @@ function handleGenerate() {
     setTimeout(() => SetState("model"), 400); // 400ms后→构建中
     setTimeout(() => {
         SetState("render"); // 600ms后→渲染完成
-        renderCharts(configs); // 渲染图表
+        renderCharts(configs, mlPayload); // 渲染图表并提交机器学习配置
     }, 600);
 
     // 6. 更新分析报告
@@ -563,11 +705,11 @@ function buildChartConfig(config, index, chartData) {
     return null;
 }
 
-async function renderCharts(configs) {
+async function renderCharts(configs, mlConfig) {
     console.log("渲染图表配置：", configs);
     const grid = $("analysis-chart-grid");
     if (!grid) return;
-
+    console.log(mlConfig);
     if (!window.Chart) {
         showNotification("图表库未加载", "error");
         return;
@@ -580,7 +722,7 @@ async function renderCharts(configs) {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ chartConfig: configs })
+            body: JSON.stringify({ chartConfig: configs, mlConfig: mlConfig || [] })
         });
         const result = await response.json();
         if (!result.success) {
@@ -655,6 +797,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateFileSummary(file);
         updatePreviewLink(file);
         RemoveChart();
+        RemoveMlConfig();
         loadPreview(fileId);
     });
     $("chart-add").addEventListener("click", () => {
@@ -672,5 +815,24 @@ document.addEventListener("DOMContentLoaded", () => {
         chartsConfig.push({ id: newCard.dataset.chartId, card: newCard }); // 默认类型为折线图，字段映射为空
         configArea.appendChild(newCard);
     });
+    const mlAddButton = $("ml-add");
+    if (mlAddButton) {
+        mlAddButton.addEventListener("click", () => {
+            if ($("analysis-file").value === "") {
+                showNotification("请先选择一个文件", "warning");
+                return;
+            }
+            mlConfigCount += 1;
+            if (mlConfigCount > 0) {
+                const empty = $("ml-config-empty");
+                if (empty) empty.style.display = "none";
+            }
+            const configArea = $("ml-config-list");
+            if (!configArea) return;
+            const newCard = createMlConfigCard(mlConfigCount);
+            mlConfigs.push({ id: newCard.dataset.mlId, card: newCard });
+            configArea.appendChild(newCard);
+        });
+    }
     $("analysis-generate").addEventListener("click", handleGenerate);
 });
