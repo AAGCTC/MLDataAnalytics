@@ -4,38 +4,28 @@ from typing import Optional, List, Tuple, Union, Dict
 import os
 
 
-def read_csv_file(file_path: str) -> Tuple[pd.DataFrame, int]:
+# 读取CSV文件，返回数据DataFrame、数据行数和列数
+def read_file_with_stats(file_path: str, encoding: str = None) -> Tuple[pd.DataFrame, int, int]:
     """
-    读取CSV文件并返回数据和总行数（包含数据行，不含表头）
-    
+    读取文件并返回数据、数据行数和列数
+
     Args:
         file_path: 文件路径
+        encoding: 文件编码（可选）
         
     Returns:
-        (DataFrame, 数据行数)
+        (DataFrame, 数据行数, 列数)
     """
-    df = pd.read_csv(file_path)
-    # 返回DataFrame和数据行数（不包括表头行）
-    return df, len(df)
-
-
-def get_file_row_count(file_path: str) -> int:
-    """
-    获取CSV文件的总行数（包括表头行和所有数据行）
+    if encoding:
+        df = pd.read_csv(file_path, encoding=encoding)
+    else:
+        df = pd.read_csv(file_path)
     
-    Args:
-        file_path: 文件路径
-        
-    Returns:
-        总行数（表头 + 数据行）
-    """
-    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-        lines = f.readlines()
-    # 统计非空行
-    row_count = sum(1 for line in lines if line.strip())
-    return row_count
+    # 返回DataFrame、数据行数（不含表头）和列数
+    return df, int(df.shape[0]), int(df.shape[1])
 
 
+# 删除含有空值的行或列
 def drop_missing_values(df: pd.DataFrame,
                         axis: int = 0,
                         thresh: Optional[int] = None) -> pd.DataFrame:
@@ -44,6 +34,7 @@ def drop_missing_values(df: pd.DataFrame,
     return df.dropna(axis=axis, thresh=thresh)
 
 
+# 填充空值，支持均值、中位数、众数、固定值、前向填充、后向填充
 def fill_missing_values(df: pd.DataFrame,
                         method: str = 'mean',
                         columns: Optional[List[str]] = None,
@@ -90,7 +81,8 @@ def fill_missing_values(df: pd.DataFrame,
             elif method == 'constant':
                 fill_val = value if value is not None else 0
                 # 如果指定的值是 NaN 或无穷大，使用 0 填充
-                if pd.isna(fill_val) or not np.isfinite(fill_val):
+                # 只对数值类型进行 np.isfinite 检查
+                if pd.isna(fill_val) or (isinstance(fill_val, (int, float, np.number)) and not np.isfinite(fill_val)):
                     fill_val = 0
             else:
                 continue
@@ -110,12 +102,14 @@ def fill_missing_values(df: pd.DataFrame,
     return df_copy
 
 
+# 删除重复行，默认保留第一条
 def remove_duplicates(df: pd.DataFrame,
                       subset: Optional[List[str]] = None,
                       keep: str = 'first') -> pd.DataFrame:
     return df.drop_duplicates(subset=subset, keep=keep)
 
 
+# 检测数值列中的异常值，使用IQR或Z-score方法，返回带检测标记列的DataFrame
 def detect_outliers(df: pd.DataFrame,
                     columns: Optional[List[str]] = None,
                     method: str = 'iqr',
@@ -152,6 +146,7 @@ def detect_outliers(df: pd.DataFrame,
     return df_copy
 
 
+# 删除含有异常值的行
 def remove_outliers(df: pd.DataFrame,
                     columns: Optional[List[str]] = None,
                     method: str = 'iqr',
@@ -163,35 +158,22 @@ def remove_outliers(df: pd.DataFrame,
 
     numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
 
-    # 先找出所有异常值的索引
-    outlier_indices = set()
-    for col in numeric_cols:
-        if method == 'iqr':
-            q1 = df_copy[col].quantile(0.25)
-            q3 = df_copy[col].quantile(0.75)
-            iqr = q3 - q1
-            # 如果 IQR 为 0（所有值相同或分布非常集中），跳过该列
-            if iqr == 0:
-                continue
-            lower_bound = q1 - threshold * iqr
-            upper_bound = q3 + threshold * iqr
-            col_outliers = ~df_copy[col].between(lower_bound, upper_bound)
-        elif method == 'zscore':
-            mean = df_copy[col].mean()
-            std = df_copy[col].std()
-            if std == 0:
-                continue
-            z_scores = np.abs((df_copy[col] - mean) / std)
-            col_outliers = z_scores > threshold
-        else:
-            raise ValueError(f"Unknown method: {method}")
-        
-        outlier_indices.update(df_copy[col_outliers].index)
-    
-    # 移除所有异常值行
+    if len(numeric_cols) == 0:
+        return df_copy
+
+    df_outliers = detect_outliers(df_copy, columns=numeric_cols, method=method, threshold=threshold)
+    outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
+
+    if not outlier_cols:
+        return df_copy
+
+    any_outlier = df_outliers[outlier_cols].any(axis=1)
+    outlier_indices = df_outliers[any_outlier].index
+
     return df_copy.drop(index=list(outlier_indices))
 
 
+# 处理异常值，支持删除、替换为中位数、盖帽法
 def handle_outliers(df: pd.DataFrame,
                     columns: Optional[List[str]] = None,
                     method: str = 'iqr',
@@ -204,167 +186,51 @@ def handle_outliers(df: pd.DataFrame,
 
     numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
 
-    for col in numeric_cols:
-        if method == 'iqr':
-            q1 = df_copy[col].quantile(0.25)
-            q3 = df_copy[col].quantile(0.75)
-            iqr = q3 - q1
-            lower_bound = q1 - threshold * iqr
-            upper_bound = q3 + threshold * iqr
-            outliers = ~df_copy[col].between(lower_bound, upper_bound)
-        elif method == 'zscore':
-            mean = df_copy[col].mean()
-            std = df_copy[col].std()
-            if std == 0:
-                continue
-            z_scores = np.abs((df_copy[col] - mean) / std)
-            outliers = z_scores > threshold
-        else:
-            raise ValueError(f"Unknown method: {method}")
+    if len(numeric_cols) == 0:
+        return df_copy
 
-        if handle_method == 'remove':
-            # 只记录需要删除的索引，最后统一处理
-            pass
-        elif handle_method == 'replace':
+    if handle_method == 'remove':
+        return remove_outliers(df_copy, columns=numeric_cols, method=method, threshold=threshold)
+
+    df_outliers = detect_outliers(df_copy, columns=numeric_cols, method=method, threshold=threshold)
+    outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
+
+    if not outlier_cols:
+        return df_copy
+
+    any_outlier = df_outliers[outlier_cols].any(axis=1)
+
+    if handle_method == 'replace':
+        for col in numeric_cols:
             median_val = df_copy[col].median()
-            df_copy.loc[outliers, col] = median_val
-        elif handle_method == 'cap':
+            if pd.isna(median_val) or not np.isfinite(median_val):
+                median_val = 0
+            col_outlier_col = f'is_outlier_{col}'
+            if col_outlier_col in df_outliers.columns:
+                df_copy.loc[df_outliers[col_outlier_col], col] = median_val
+    elif handle_method == 'cap':
+        for col in numeric_cols:
             if method == 'iqr':
                 q1 = df_copy[col].quantile(0.25)
                 q3 = df_copy[col].quantile(0.75)
                 iqr = q3 - q1
+                if iqr == 0:
+                    continue
                 lower_bound = q1 - threshold * iqr
                 upper_bound = q3 + threshold * iqr
+            elif method == 'zscore':
+                mean = df_copy[col].mean()
+                std = df_copy[col].std()
+                if std == 0:
+                    continue
+                lower_bound = mean - threshold * std
+                upper_bound = mean + threshold * std
             df_copy[col] = df_copy[col].clip(lower=lower_bound, upper=upper_bound)
-    
-    # 如果是 remove 方法，最后统一删除
-    if handle_method == 'remove':
-        df_copy = remove_outliers(df_copy, columns=columns, method=method, threshold=threshold)
-    
+
     return df_copy
 
 
-def standardize_data(df: pd.DataFrame,
-                     columns: Optional[List[str]] = None) -> pd.DataFrame:
-    df_copy = df.copy()
-
-    if columns is None:
-        columns = df_copy.select_dtypes(include=[np.number]).columns
-
-    numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
-
-    for col in numeric_cols:
-        mean = df_copy[col].mean()
-        std = df_copy[col].std()
-        if std != 0:
-            df_copy[col] = (df_copy[col] - mean) / std
-        else:
-            df_copy[col] = 0  # 全相同值，标准化为0
-    return df_copy
-
-
-def normalize_data(df: pd.DataFrame,
-                   columns: Optional[List[str]] = None,
-                   method: str = 'minmax') -> pd.DataFrame:
-    df_copy = df.copy()
-
-    if columns is None:
-        columns = df_copy.select_dtypes(include=[np.number]).columns
-
-    numeric_cols = [c for c in columns if c in df_copy.select_dtypes(include=[np.number]).columns]
-
-    for col in numeric_cols:
-        if method == 'minmax':
-            min_val = df_copy[col].min()
-            max_val = df_copy[col].max()
-            if max_val != min_val:
-                df_copy[col] = (df_copy[col] - min_val) / (max_val - min_val)
-            else:
-                df_copy[col] = 0
-        elif method == 'maxabs':
-            max_abs = df_copy[col].abs().max()
-            if max_abs != 0:
-                df_copy[col] = df_copy[col] / max_abs
-            else:
-                df_copy[col] = 0
-    return df_copy
-
-
-def convert_dtypes(df: pd.DataFrame,
-                   conversions: Optional[dict] = None) -> pd.DataFrame:
-    df_copy = df.copy()
-    if conversions is None:
-        return df_copy.convert_dtypes()
-    for col, dtype in conversions.items():
-        if col in df_copy.columns:
-            df_copy[col] = df_copy[col].astype(dtype)
-    return df_copy
-
-
-def trim_string_columns(df: pd.DataFrame,
-                        columns: Optional[List[str]] = None) -> pd.DataFrame:
-    df_copy = df.copy()
-    if columns is None:
-        columns = df_copy.select_dtypes(include=['object', 'string']).columns
-    for col in columns:
-        df_copy[col] = df_copy[col].astype(str).str.strip()
-    return df_copy
-
-
-def remove_special_characters(df: pd.DataFrame,
-                              columns: Optional[List[str]] = None,
-                              pattern: str = r'[^a-zA-Z0-9\u4e00-\u9fa5\s]') -> pd.DataFrame:
-    df_copy = df.copy()
-    if columns is None:
-        columns = df_copy.select_dtypes(include=['object', 'string']).columns
-    for col in columns:
-        df_copy[col] = df_copy[col].astype(str).str.replace(pattern, '', regex=True)
-    return df_copy
-
-
-def filter_by_condition(df: pd.DataFrame,
-                        conditions: List[Tuple[str, str, Union[int, float, str]]]) -> pd.DataFrame:
-    df_copy = df.copy()
-    mask = pd.Series([True] * len(df_copy))
-
-    for col, op, val in conditions:
-        if col not in df_copy.columns:
-            continue
-
-        if op == '==':
-            mask &= df_copy[col] == val
-        elif op == '!=':
-            mask &= df_copy[col] != val
-        elif op == '>':
-            mask &= df_copy[col] > val
-        elif op == '<':
-            mask &= df_copy[col] < val
-        elif op == '>=':
-            mask &= df_copy[col] >= val
-        elif op == '<=':
-            mask &= df_copy[col] <= val
-        elif op == 'in':
-            mask &= df_copy[col].isin(val)
-        elif op == 'not in':
-            mask &= ~df_copy[col].isin(val)
-        elif op == 'contains':
-            # 只对字符串列安全执行
-            if df_copy[col].dtype == 'object' or df_copy[col].dtype == 'string':
-                mask &= df_copy[col].str.contains(val, na=False)
-    return df_copy[mask]
-
-
-def get_data_summary(df: pd.DataFrame) -> pd.DataFrame:
-    summary = pd.DataFrame({
-        '列名': df.columns,
-        '数据类型': df.dtypes.values,
-        '非空值数量': df.notnull().sum().values,
-        '空值数量': df.isnull().sum().values,
-        '空值比例': (df.isnull().sum() / len(df)).round(4).values
-    })
-    return summary
-
-
+# 根据规则清洗数据：处理重复行、空值、异常值，返回清洗后的数据和统计信息
 def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Dict]:
     """
     根据规则清洗数据，并返回清洗后的结果和统计信息
@@ -428,9 +294,7 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
         before_outlier_count = 0
         # 获取所有数值列
         numeric_cols = df_copy.select_dtypes(include=[np.number]).columns.tolist()
-        # 排除 ID 列（年份、月份、版本等）
-        id_columns = ['年份', '月份', '版本', 'id', 'ID', 'Id', 'no', 'No', 'NO', 'number', 'Number']
-        business_numeric_cols = [col for col in numeric_cols if col not in id_columns]
+        business_numeric_cols = [col for col in numeric_cols]
         
         if len(business_numeric_cols) > 0:
             df_outliers = detect_outliers(df_copy, columns=business_numeric_cols)
@@ -448,37 +312,19 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
         elif outlier_rule == 'cap':
             df_copy = handle_outliers(df_copy, columns=business_numeric_cols, handle_method='cap')
             stats['handled_outliers'] = before_outlier_count
-        elif outlier_rule == 'replace-mean':
-            # 使用均值替换异常值（排除异常值后计算均值）
+        elif outlier_rule in ('replace-mean', 'replace-median'):
+            agg_func = pd.DataFrame.mean if outlier_rule == 'replace-mean' else pd.DataFrame.median
             for col in business_numeric_cols:
                 df_outliers = detect_outliers(df_copy, columns=[col])
                 outliers = df_outliers[f'is_outlier_{col}']
                 if outliers.any():
-                    # 排除异常值后计算均值
                     non_outlier_values = df_copy.loc[~outliers, col]
-                    mean_val = non_outlier_values.mean()
-                    if pd.isna(mean_val) or not np.isfinite(mean_val):
-                        mean_val = 0
-                    # 根据列的数据类型转换值
+                    fill_val = agg_func(non_outlier_values)
+                    if pd.isna(fill_val) or not np.isfinite(fill_val):
+                        fill_val = 0
                     if df_copy[col].dtype == np.int64:
-                        mean_val = int(mean_val)
-                    df_copy.loc[outliers, col] = mean_val
-            stats['handled_outliers'] = before_outlier_count
-        elif outlier_rule == 'replace-median':
-            # 使用中位数替换异常值（排除异常值后计算中位数）
-            for col in business_numeric_cols:
-                df_outliers = detect_outliers(df_copy, columns=[col])
-                outliers = df_outliers[f'is_outlier_{col}']
-                if outliers.any():
-                    # 排除异常值后计算中位数
-                    non_outlier_values = df_copy.loc[~outliers, col]
-                    median_val = non_outlier_values.median()
-                    if pd.isna(median_val) or not np.isfinite(median_val):
-                        median_val = 0
-                    # 根据列的数据类型转换值
-                    if df_copy[col].dtype == np.int64:
-                        median_val = int(median_val)
-                    df_copy.loc[outliers, col] = median_val
+                        fill_val = int(fill_val)
+                    df_copy.loc[outliers, col] = fill_val
             stats['handled_outliers'] = before_outlier_count
         else:
             df_copy = handle_outliers(df_copy, columns=business_numeric_cols, handle_method='remove')
@@ -489,6 +335,7 @@ def clean_data_by_rules(df: pd.DataFrame, rules: Dict) -> Tuple[pd.DataFrame, Di
     return df_copy, stats
 
 
+# 检测数据质量：统计重复行、空值行、异常值行，计算有效行数和质量分数
 def detect_data_quality(df: pd.DataFrame) -> Dict:
     """
     检测数据质量，返回详细的质量报告
@@ -517,8 +364,9 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
     # 检测重复行（优先级最高）
     duplicate_mask = df.duplicated()
     duplicate_rows = df[duplicate_mask]
-    report['duplicate_rows'] = len(duplicate_rows)
-    if len(duplicate_rows) > 0:
+    duplicate_count = len(duplicate_rows)
+    report['duplicate_rows'] = duplicate_count
+    if duplicate_count > 0:
         report['outlier_headers'] = list(df.columns)
         report['outlier_data'] = duplicate_rows.fillna('').head(20).values.tolist()
         report['duplicate_data'] = duplicate_rows.fillna('').head(20).values.tolist()
@@ -526,7 +374,7 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
     # 先去除重复行，只取其中一条
     df_unique = df.drop_duplicates()
 
-    # 找出含有空值的行
+    # 找出含有空值的行（只在空值行中显示，不混入异常值）
     null_mask = df_unique.isnull().any(axis=1)
     null_rows = df_unique[null_mask]
     report['null_rows'] = len(null_rows)
@@ -534,26 +382,34 @@ def detect_data_quality(df: pd.DataFrame) -> Dict:
         report['null_headers'] = list(df.columns)
         report['null_data'] = null_rows.fillna('').head(20).values.tolist()
 
-    # 检测异常值（使用去重后的数据）
-    numeric_cols = df_unique.select_dtypes(include=[np.number]).columns.tolist()
-    id_columns = ['年份', '月份', '版本', 'id', 'ID', 'Id', 'no', 'No', 'NO', 'number', 'Number']
-    business_numeric_cols = [col for col in numeric_cols if col not in id_columns]
+    # 检测数值异常值（排除空值行，确保空值行不在异常行中显示）
+    df_no_null = df_unique[~null_mask]
+    numeric_cols = df_no_null.select_dtypes(include=[np.number]).columns.tolist()
+    business_numeric_cols = [col for col in numeric_cols]
 
+    numeric_outlier_count = 0
     if len(business_numeric_cols) > 0:
-        df_outliers = detect_outliers(df_unique, columns=business_numeric_cols)
+        df_outliers = detect_outliers(df_no_null, columns=business_numeric_cols)
         outlier_cols = [col for col in df_outliers.columns if col.startswith('is_outlier_')]
         if outlier_cols:
             any_outlier = df_outliers[outlier_cols].any(axis=1)
-            outlier_rows = df_outliers[any_outlier]
-            report['outlier_rows'] = len(outlier_rows)
-            if len(outlier_rows) > 0:
+            # 只返回原始数据列，不包含检测标记列
+            outlier_rows = df_no_null[any_outlier]
+            numeric_outlier_count = len(outlier_rows)
+            if numeric_outlier_count > 0:
                 if report['outlier_data'] == []:
                     report['outlier_headers'] = list(df.columns)
                     report['outlier_data'] = outlier_rows.fillna('').head(20).values.tolist()
+                else:
+                    outlier_data_list = outlier_rows.fillna('').head(20).values.tolist()
+                    report['outlier_data'].extend(outlier_data_list)
 
-    # 计算有效行数（使用去重后的总行数减去空值行和异常行）
+    # 异常值行数 = 重复行数 + 数值异常值行数（不包含空值行）
+    report['outlier_rows'] = duplicate_count + numeric_outlier_count
+
+    # 计算有效行数（去重后 - 空值行 - 数值异常行）
     unique_rows = len(df_unique)
-    report['effective_rows'] = unique_rows - report['null_rows'] - report['outlier_rows']
+    report['effective_rows'] = unique_rows - report['null_rows'] - numeric_outlier_count
     if unique_rows > 0:
         report['quality_score'] = round(report['effective_rows'] / unique_rows * 100, 1)
     else:
