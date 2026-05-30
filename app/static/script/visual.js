@@ -10,6 +10,8 @@ let numericColumns = [];
 let chartInstances = [];
 let chartCount = 0; // 图表计数器，用于生成唯一ID
 let chartsConfig = []; // 存储当前图表配置数据
+let mlConfigCount = 0; // 机器学习配置计数器
+let mlConfigs = []; // 存储机器学习配置数据
 const chartSchemas = {
     line: { label: "折线图", fields: [{ key: "x", label: "X 轴", type: "any", required: true }, { key: "y", label: "Y 值", type: "numeric", required: true }] },
     area: { label: "面积图", fields: [{ key: "x", label: "X 轴", type: "any", required: true }, { key: "y", label: "Y 值", type: "numeric", required: true }] },
@@ -17,6 +19,12 @@ const chartSchemas = {
     pie: { label: "饼图", fields: [{ key: "label", label: "标签", type: "any", required: true }, { key: "value", label: "数值(可选)", type: "numeric", required: false }] },
     scatter: { label: "散点图", fields: [{ key: "x", label: "X 值", type: "numeric", required: true }, { key: "y", label: "Y 值", type: "numeric", required: true }] },
     radar: { label: "雷达图", fields: [{ key: "label", label: "标签", type: "any", required: true }, { key: "value", label: "数值", type: "numeric", required: true }] }
+};
+
+const mlSchemas = {
+    regression: { label: "回归", targetRequired: true },
+    classification: { label: "分类", targetRequired: true },
+    clustering: { label: "聚类", targetRequired: false }
 };
 
 const chartPalette = ["#4fd1ff", "#f5b544", "#2de2a6", "#fca5a5", "#93c5fd", "#f97316"];
@@ -265,6 +273,165 @@ function renderConfigFields(card) {
     });
 }
 
+// 创建机器学习配置卡片
+function createMlConfigCard(index) {
+    const card = document.createElement("div");
+    card.className = "chart-config ml-config";
+    card.dataset.mlId = `ml-${Date.now()}-${index}`;
+    const mlId = card.dataset.mlId;
+
+    const head = document.createElement("div");
+    head.className = "config-head";
+    const title = document.createElement("div");
+    title.className = "config-title";
+    title.textContent = `模型 ${String(index).padStart(2, "0")}`;
+    const remove = document.createElement("button");
+    remove.className = "config-remove";
+    remove.type = "button";
+    remove.textContent = "移除";
+    remove.addEventListener("click", () => {
+        RemoveMlConfig(mlId);
+        updateMlTitles();
+    });
+    head.appendChild(title);
+    head.appendChild(remove);
+
+    const typeRow = document.createElement("div");
+    typeRow.className = "config-field";
+    const typeLabel = document.createElement("label");
+    typeLabel.textContent = "学习任务";
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "card";
+    Object.keys(mlSchemas).forEach((type) => {
+        const option = document.createElement("option");
+        option.value = type;
+        option.textContent = mlSchemas[type].label;
+        typeSelect.appendChild(option);
+    });
+    typeSelect.addEventListener("change", () => {
+        renderMlFields(card);
+    });
+    typeRow.appendChild(typeLabel);
+    typeRow.appendChild(typeSelect);
+
+    const fields = document.createElement("div");
+    fields.className = "config-fields";
+
+    card.appendChild(head);
+    card.appendChild(typeRow);
+    card.appendChild(fields);
+
+    renderMlFields(card);
+    return card;
+}
+
+// 渲染机器学习字段配置
+function renderMlFields(card) {
+    const typeSelect = card.querySelector(".card");
+    const type = typeSelect ? typeSelect.value : "regression";
+    const fieldsContainer = card.querySelector(".config-fields");
+    if (!fieldsContainer) return;
+
+    fieldsContainer.innerHTML = "";
+    const schema = mlSchemas[type] || mlSchemas.regression;
+
+    const targetField = {
+        key: "target",
+        label: schema.targetRequired ? "目标列" : "目标列(可选)",
+        required: schema.targetRequired
+    };
+
+    const targetWrapper = document.createElement("div");
+    targetWrapper.className = "config-field";
+
+    const targetLabel = document.createElement("label");
+    targetLabel.textContent = targetField.label;
+
+    const targetSelect = document.createElement("select");
+    targetSelect.className = "viz-select";
+    targetSelect.dataset.field = targetField.key;
+    populateSelect(targetSelect, columnList, !targetField.required);
+
+    targetWrapper.appendChild(targetLabel);
+    targetWrapper.appendChild(targetSelect);
+    fieldsContainer.appendChild(targetWrapper);
+
+    if (type === "regression" || type === "clustering") {
+        const featureLabel = document.createElement("label");
+        featureLabel.textContent = type === "clustering" ? "特征列(至少2个)" : "特征列(可多选)";
+
+        const featureListWrapper = document.createElement("div");
+        featureListWrapper.className = "config-field feature-checkbox-list";
+        featureListWrapper.appendChild(featureLabel);
+
+        numericColumns.forEach((col) => {
+            const checkboxWrapper = document.createElement("div");
+            checkboxWrapper.className = "feature-checkbox-item";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = col;
+            checkbox.dataset.field = "features";
+
+            const label = document.createElement("span");
+            label.textContent = col;
+
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(label);
+            featureListWrapper.appendChild(checkboxWrapper);
+        });
+
+        fieldsContainer.appendChild(featureListWrapper);
+    } else {
+        const featureField = { key: "feature", label: "特征列", required: true };
+        const featureWrapper = document.createElement("div");
+        featureWrapper.className = "config-field";
+
+        const featureLabelEl = document.createElement("label");
+        featureLabelEl.textContent = featureField.label;
+
+        const featureSelect = document.createElement("select");
+        featureSelect.className = "viz-select";
+        featureSelect.dataset.field = featureField.key;
+        populateSelect(featureSelect, columnList, !featureField.required);
+
+        featureWrapper.appendChild(featureLabelEl);
+        featureWrapper.appendChild(featureSelect);
+        fieldsContainer.appendChild(featureWrapper);
+    }
+}
+
+// 更新机器学习配置卡片标题
+function updateMlTitles() {
+    const cards = Array.from(document.querySelectorAll(".ml-config"));
+    cards.forEach((card, index) => {
+        const title = card.querySelector(".config-title");
+        if (title) title.textContent = `模型 ${String(index + 1).padStart(2, "0")}`;
+    });
+}
+
+// 移除机器学习配置卡片
+function RemoveMlConfig(mlId) {
+    if (!mlId) {
+        mlConfigs.forEach((c) => c.card.remove());
+        mlConfigs = [];
+        mlConfigCount = 0;
+        const empty = $("ml-config-empty");
+        if (empty) empty.style.display = "block";
+        return;
+    }
+    const card = mlConfigs.find((c) => c.id === mlId);
+    if (card) {
+        card.card.remove();
+        mlConfigs.splice(mlConfigs.indexOf(card), 1);
+        mlConfigCount -= 1;
+    }
+    if (mlConfigCount === 0) {
+        const empty = $("ml-config-empty");
+        if (empty) empty.style.display = "block";
+    }
+}
+
 // 加载文件预览数据（从后端获取前200行数据），并推断数值型字段
 async function loadPreview(fileId) {
     if (!fileId) {
@@ -274,7 +441,8 @@ async function loadPreview(fileId) {
         return;
     }
     try {
-        const response = await fetch(`/api/files/history/${fileId}/preview?rowCount=200`);
+        const userId = localStorage.getItem('animeflowUserId');
+        const response = await fetch(`/api/files/${userId}/history/${fileId}/preview?rowCount=200`);
         if (!response.ok) showNotification("文件加载失败");
         const data = await response.json();
         previewRows = Array.isArray(data.data) ? data.data : [];
@@ -282,15 +450,18 @@ async function loadPreview(fileId) {
         numericColumns = inferNumericColumns(previewRows, columnList); // 推断数值字段
 
         // 更新所有配置卡片的字段选择框
-        const cards = Array.from(document.querySelectorAll(".chart-config"));
-        cards.forEach((card) => renderConfigFields(card));
+        const chartCards = Array.from(document.querySelectorAll(".chart-config:not(.ml-config)"));
+        chartCards.forEach((card) => renderConfigFields(card));
+
+        const mlCards = Array.from(document.querySelectorAll(".ml-config"));
+        mlCards.forEach((card) => renderMlFields(card));
     } catch (error) {
         showNotification(error.message, "error");
     }
 }
 // 更新所有配置卡片的标题（如「图表 01」、「图表 02」...）
 function updateConfigTitles() {
-    const cards = Array.from(document.querySelectorAll(".chart-config"));
+    const cards = Array.from(document.querySelectorAll(".chart-config:not(.ml-config)"));
     cards.forEach((card, index) => {
         const title = card.querySelector(".config-title");
         if (title) title.textContent = `图表 ${String(index + 1).padStart(2, "0")}`;
@@ -342,10 +513,7 @@ function handleGenerate() {
         });
         return { type, fields };
     });
-    if (!configs.length) {
-        showNotification("请至少添加一个图表", "error");
-        return;
-    }
+    
 
     // 4. 校验：必填字段是否填写
     let isValid = true;
@@ -363,6 +531,52 @@ function handleGenerate() {
         showNotification("请补全必选字段", "error");
         return;
     }
+    const mlPayload = mlConfigs.map((c) => {
+        const type = c.card.querySelector(".card").value;
+        const fieldSelects = c.card.querySelectorAll(".viz-select");
+        const fields = {};
+        fieldSelects.forEach((select) => {
+            const key = select.dataset.field;
+            const value = select.value;
+            if (value) fields[key] = value;
+        });
+
+        const featureCheckboxes = c.card.querySelectorAll(".feature-checkbox-item input[type='checkbox']:checked");
+        if (featureCheckboxes.length > 0) {
+            fields.features = Array.from(featureCheckboxes).map(cb => cb.value);
+        }
+
+        return { type, fields };
+    });
+
+    let mlIsValid = true;
+    mlPayload.forEach((config) => {
+        const schema = mlSchemas[config.type];
+        if (schema && schema.targetRequired) {
+            if (!config.fields.target || config.fields.target === "") {
+                mlIsValid = false;
+            }
+        }
+        if (config.type === "regression") {
+            if (!config.fields.features || config.fields.features.length === 0) {
+                mlIsValid = false;
+            }
+        }
+        if (config.type === "clustering") {
+            if (!config.fields.features || config.fields.features.length < 2) {
+                mlIsValid = false;
+            }
+        }
+    });
+    if (!mlIsValid) {
+        showNotification("请补全机器学习配置（回归需特征列，聚类需至少2个特征列）", "error");
+        return;
+    }
+
+    if (!configs.length&&!mlPayload.length) {
+        showNotification("请至少添加一个图表或模型", "error");
+        return;
+    }
     showNotification("正在生成图表...", "info");
     // 5. 显示结果区域，更新状态（模拟处理流程）
     setResultVisible(true);
@@ -371,7 +585,7 @@ function handleGenerate() {
     setTimeout(() => SetState("model"), 400); // 400ms后→构建中
     setTimeout(() => {
         SetState("render"); // 600ms后→渲染完成
-        renderCharts(configs); // 渲染图表
+        renderCharts(configs, mlPayload); // 渲染图表并提交机器学习配置
     }, 600);
 
     // 6. 更新分析报告
@@ -563,11 +777,11 @@ function buildChartConfig(config, index, chartData) {
     return null;
 }
 
-async function renderCharts(configs) {
+async function renderCharts(configs, mlConfig) {
     console.log("渲染图表配置：", configs);
     const grid = $("analysis-chart-grid");
     if (!grid) return;
-
+    console.log(mlConfig);
     if (!window.Chart) {
         showNotification("图表库未加载", "error");
         return;
@@ -575,12 +789,13 @@ async function renderCharts(configs) {
 
     clearCharts();
     try {
-        const response = await fetch(`/api/files/history/${$("analysis-file").value}/visualization`, {
+        const userid= localStorage.getItem('animeflowUserId');
+        const response = await fetch(`/api/files/${userid}/history/${$("analysis-file").value}/visualization`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ chartConfig: configs })
+            body: JSON.stringify({ chartConfig: configs, mlConfig: mlConfig || [] })
         });
         const result = await response.json();
         if (!result.success) {
@@ -626,6 +841,292 @@ async function renderCharts(configs) {
             });
             chartInstances.push(chart);
         });
+
+        if (result.mlData && result.mlData.length > 0) {
+            const mlData = result.mlData;
+            mlConfig.forEach((config, index) => {
+                const mlChartData = mlData[index];
+                if (!mlChartData) return;
+
+                const mlType = config.type;
+                const mlLabel = mlSchemas[mlType] ? mlSchemas[mlType].label : mlType;
+                const chartIndex = configs.length + index;
+
+                if (mlChartData.error) {
+                    const card = document.createElement("div");
+                    card.className = "chart-card";
+                    const title = document.createElement("h4");
+                    title.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel}`;
+                    const errorMsg = document.createElement("div");
+                    errorMsg.className = "chart-error";
+                    errorMsg.style.color = "#fca5a5";
+                    errorMsg.style.padding = "20px";
+                    errorMsg.style.textAlign = "center";
+                    errorMsg.textContent = `错误: ${mlChartData.error}`;
+                    card.appendChild(title);
+                    card.appendChild(errorMsg);
+                    grid.appendChild(card);
+                    return;
+                }
+
+                const accent = chartPalette[chartIndex % chartPalette.length];
+
+                if (mlType === 'regression') {
+                    const barData = mlChartData.bar;
+                    const scatterData = mlChartData.scatter;
+
+                    const barCard = document.createElement("div");
+                    barCard.className = "chart-card";
+                    const barTitle = document.createElement("h4");
+                    barTitle.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel} - 回归系数`;
+                    const barCanvas = document.createElement("canvas");
+                    barCanvas.className = "chart-canvas";
+                    const barFrame = document.createElement("div");
+                    barFrame.className = "chart-frame";
+                    barFrame.style.height = "270px";
+                    barFrame.style.width = "100%";
+                    barFrame.style.position = "relative";
+                    barFrame.appendChild(barCanvas);
+                    barCard.appendChild(barTitle);
+                    barCard.appendChild(barFrame);
+                    grid.appendChild(barCard);
+
+                    const barChartConfig = {
+                        type: 'bar',
+                        data: {
+                            labels: barData.labels,
+                            datasets: [{
+                                label: '回归系数',
+                                data: barData.values,
+                                backgroundColor: accent
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { labels: { color: "#cbd5e1" } } },
+                            scales: {
+                                x: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(255,255,255,0.05)" } },
+                                y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(255,255,255,0.05)" } }
+                            }
+                        }
+                    };
+                    chartInstances.push(new Chart(barCanvas, barChartConfig));
+
+                    const scatterCard = document.createElement("div");
+                    scatterCard.className = "chart-card";
+                    const scatterTitle = document.createElement("h4");
+                    scatterTitle.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel} - 残差图`;
+                    const scatterCanvas = document.createElement("canvas");
+                    scatterCanvas.className = "chart-canvas";
+                    const scatterFrame = document.createElement("div");
+                    scatterFrame.className = "chart-frame";
+                    scatterFrame.style.height = "270px";
+                    scatterFrame.style.width = "100%";
+                    scatterFrame.style.position = "relative";
+                    scatterFrame.appendChild(scatterCanvas);
+                    scatterCard.appendChild(scatterTitle);
+                    scatterCard.appendChild(scatterFrame);
+                    grid.appendChild(scatterCard);
+
+                    const scatterChartConfig = {
+                        type: 'scatter',
+                        data: {
+                            datasets: [{
+                                label: '残差',
+                                data: scatterData.points,
+                                backgroundColor: accent
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { labels: { color: "#cbd5e1" } } },
+                            scales: {
+                                x: { 
+                                    title: { display: true, text: '预测值', color: "#94a3b8" },
+                                    ticks: { color: "#94a3b8" }, 
+                                    grid: { color: "rgba(255,255,255,0.05)" } 
+                                },
+                                y: { 
+                                    title: { display: true, text: '残差', color: "#94a3b8" },
+                                    ticks: { color: "#94a3b8" }, 
+                                    grid: { color: "rgba(255,255,255,0.05)" } 
+                                }
+                            }
+                        }
+                    };
+                    chartInstances.push(new Chart(scatterCanvas, scatterChartConfig));
+
+                } else if (mlType === 'clustering') {
+                    // 检查是否有 pie 和 scatter 字段（特征列为2个的情况）
+                    if (mlChartData.pie && mlChartData.scatter) {
+                        // 渲染饼图
+                        const pieCard = document.createElement("div");
+                        pieCard.className = "chart-card";
+                        const pieTitle = document.createElement("h4");
+                        pieTitle.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel} - 簇分布`;
+                        const pieCanvas = document.createElement("canvas");
+                        pieCanvas.className = "chart-canvas";
+                        const pieFrame = document.createElement("div");
+                        pieFrame.className = "chart-frame";
+                        pieFrame.style.height = "270px";
+                        pieFrame.style.width = "100%";
+                        pieFrame.style.position = "relative";
+                        pieFrame.appendChild(pieCanvas);
+                        pieCard.appendChild(pieTitle);
+                        pieCard.appendChild(pieFrame);
+                        grid.appendChild(pieCard);
+
+                        const pieChartConfig = {
+                            type: 'pie',
+                            data: {
+                                labels: mlChartData.pie.labels,
+                                datasets: [{
+                                    label: mlLabel,
+                                    data: mlChartData.pie.values,
+                                    backgroundColor: mlChartData.pie.labels.map((_, idx) => chartPalette[idx % chartPalette.length])
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { labels: { color: "#cbd5e1" } } }
+                            }
+                        };
+                        chartInstances.push(new Chart(pieCanvas, pieChartConfig));
+
+                        // 渲染散点图
+                        const scatterCard = document.createElement("div");
+                        scatterCard.className = "chart-card";
+                        const scatterTitle = document.createElement("h4");
+                        scatterTitle.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel} - 散点图`;
+                        const scatterCanvas = document.createElement("canvas");
+                        scatterCanvas.className = "chart-canvas";
+                        const scatterFrame = document.createElement("div");
+                        scatterFrame.className = "chart-frame";
+                        scatterFrame.style.height = "270px";
+                        scatterFrame.style.width = "100%";
+                        scatterFrame.style.position = "relative";
+                        scatterFrame.appendChild(scatterCanvas);
+                        scatterCard.appendChild(scatterTitle);
+                        scatterCard.appendChild(scatterFrame);
+                        grid.appendChild(scatterCard);
+
+                        // 构建散点图数据集
+                        const scatterDatasets = [];
+                        const clusterPoints = mlChartData.scatter.cluster_points;
+                        Object.keys(clusterPoints).sort().forEach((cluster, idx) => {
+                            scatterDatasets.push({
+                                label: `簇 ${cluster}`,
+                                data: clusterPoints[cluster],
+                                backgroundColor: chartPalette[idx % chartPalette.length]
+                            });
+                        });
+
+                        const scatterChartConfig = {
+                            type: 'scatter',
+                            data: {
+                                datasets: scatterDatasets
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { labels: { color: "#cbd5e1" } } },
+                                scales: {
+                                    x: {
+                                        title: { display: true, text: mlChartData.scatter.x_col, color: "#94a3b8" },
+                                        ticks: { color: "#94a3b8" },
+                                        grid: { color: "rgba(255,255,255,0.05)" }
+                                    },
+                                    y: {
+                                        title: { display: true, text: mlChartData.scatter.y_col, color: "#94a3b8" },
+                                        ticks: { color: "#94a3b8" },
+                                        grid: { color: "rgba(255,255,255,0.05)" }
+                                    }
+                                }
+                            }
+                        };
+                        chartInstances.push(new Chart(scatterCanvas, scatterChartConfig));
+                    } else {
+                        // 只渲染饼图（特征列不为2个的情况）
+                        const card = document.createElement("div");
+                        card.className = "chart-card";
+                        const title = document.createElement("h4");
+                        title.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel}`;
+                        const canvas = document.createElement("canvas");
+                        canvas.className = "chart-canvas";
+                        const frame = document.createElement("div");
+                        frame.className = "chart-frame";
+                        frame.style.height = "270px";
+                        frame.style.width = "100%";
+                        frame.style.position = "relative";
+                        frame.appendChild(canvas);
+                        card.appendChild(title);
+                        card.appendChild(frame);
+                        grid.appendChild(card);
+
+                        const mlChartConfig = {
+                            type: 'pie',
+                            data: {
+                                labels: mlChartData.labels,
+                                datasets: [{
+                                    label: mlLabel,
+                                    data: mlChartData.values,
+                                    backgroundColor: mlChartData.labels.map((_, idx) => chartPalette[idx % chartPalette.length])
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { labels: { color: "#cbd5e1" } } }
+                            }
+                        };
+                        chartInstances.push(new Chart(canvas, mlChartConfig));
+                    }
+                } else {
+                    // 处理分类分析（原有逻辑）
+                    const card = document.createElement("div");
+                    card.className = "chart-card";
+                    const title = document.createElement("h4");
+                    title.textContent = `ML ${String(index + 1).padStart(2, "0")} - ${mlLabel}`;
+                    const canvas = document.createElement("canvas");
+                    canvas.className = "chart-canvas";
+                    const frame = document.createElement("div");
+                    frame.className = "chart-frame";
+                    frame.style.height = "270px";
+                    frame.style.width = "100%";
+                    frame.style.position = "relative";
+                    frame.appendChild(canvas);
+                    card.appendChild(title);
+                    card.appendChild(frame);
+                    grid.appendChild(card);
+
+                    const mlChartConfig = {
+                        type: 'bar',
+                        data: {
+                            labels: mlChartData.labels,
+                            datasets: [{
+                                label: mlLabel,
+                                data: mlChartData.values,
+                                backgroundColor: accent
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { labels: { color: "#cbd5e1" } } },
+                            scales: {
+                                x: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(255,255,255,0.05)" } },
+                                y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(255,255,255,0.05)" } }
+                            }
+                        }
+                    };
+                    chartInstances.push(new Chart(canvas, mlChartConfig));
+                }
+            });
+        }
+
         $("analysis-canvas-tag").textContent = `生成完毕`;
     } catch (error) {
         console.error("生成图表时出错:", error);
@@ -655,6 +1156,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateFileSummary(file);
         updatePreviewLink(file);
         RemoveChart();
+        RemoveMlConfig();
         loadPreview(fileId);
     });
     $("chart-add").addEventListener("click", () => {
@@ -672,5 +1174,24 @@ document.addEventListener("DOMContentLoaded", () => {
         chartsConfig.push({ id: newCard.dataset.chartId, card: newCard }); // 默认类型为折线图，字段映射为空
         configArea.appendChild(newCard);
     });
+    const mlAddButton = $("ml-add");
+    if (mlAddButton) {
+        mlAddButton.addEventListener("click", () => {
+            if ($("analysis-file").value === "") {
+                showNotification("请先选择一个文件", "warning");
+                return;
+            }
+            mlConfigCount += 1;
+            if (mlConfigCount > 0) {
+                const empty = $("ml-config-empty");
+                if (empty) empty.style.display = "none";
+            }
+            const configArea = $("ml-config-list");
+            if (!configArea) return;
+            const newCard = createMlConfigCard(mlConfigCount);
+            mlConfigs.push({ id: newCard.dataset.mlId, card: newCard });
+            configArea.appendChild(newCard);
+        });
+    }
     $("analysis-generate").addEventListener("click", handleGenerate);
 });

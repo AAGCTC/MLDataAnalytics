@@ -2,7 +2,7 @@ import os
 import chardet
 import pandas as pd
 import numpy as np
-from ml_algorithm import DataAnalyzer
+from app.ml_algorithm import DataAnalyzer
 
 # 数据处理和图表构建工具函数
 def load_dataframe(file_path):
