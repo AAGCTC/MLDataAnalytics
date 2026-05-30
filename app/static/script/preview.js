@@ -1,9 +1,47 @@
 let previewFileHistory = [];
+let previewCharts = []; // Chart.js 实例管理
 
 function initPreviewPage() {
     const previewBtn = document.getElementById('preview-btn');
     if (previewBtn) {
         previewBtn.addEventListener('click', showFileDetails);
+    }
+
+    const analyzeBtn = document.getElementById('analyze-btn');
+    if (analyzeBtn) {
+        analyzeBtn.addEventListener('click', async () => {
+            const notify = window.showNotification || ((message) => console.log(message));
+            const fileSelect = document.getElementById('history-file');
+            if (!fileSelect) {
+                notify('未找到文件选择', 'error');
+                return;
+            }
+            const filename = fileSelect.value;
+            const fileInfo = previewFileHistory.find((f) => f.name === filename);
+            if (!fileInfo) {
+                notify('请选择要分析的文件', 'error');
+                return;
+            }
+            notify('正在请求分析...', 'info');
+            try {
+                const resp = await fetch(`/api/files/history/${fileInfo.id}/analyze`, { method: 'GET' });
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    throw new Error(text || '分析接口返回错误');
+                }
+                const data = await resp.json();
+                if (!data.success) {
+                    notify('分析失败：' + (data.error || '未知错误'), 'error');
+                    return;
+                }
+                // 在页面上渲染图表
+                renderAnalysisCharts(data.charts || []);
+                notify('分析完成', 'success');
+            } catch (err) {
+                console.error('Analyze error:', err);
+                notify('分析请求失败：' + err.message, 'error');
+            }
+        });
     }
 
     if (document.getElementById('history-file')) {
@@ -16,11 +54,19 @@ async function fetchFileHistory() {
     if (!fileSelect) {
         return;
     }
-
+    if (!localStorage.getItem('animeflowUserId')) {
+        showNotification('用户未登录', 'warning');
+        const emptyOption = document.createElement('option');
+        emptyOption.value = '';
+        emptyOption.textContent = '暂无数据文件，请先上传';
+        emptyOption.disabled = true;
+        fileSelect.appendChild(emptyOption);
+        return;
+    }
     try {
-        const response = await fetch('/api/files/history');
+        const response = await fetch(`/api/files/${localStorage.getItem('animeflowUserId')}/history`);
         if (!response.ok) {
-            throw new Error('Failed to fetch file history');
+            showNotification('Failed to fetch file history', 'error');
         }
         const data = await response.json();
 
@@ -234,6 +280,65 @@ function updatePreviewInfo(previewData, columns, filename, nonecount) {
     }
 }
 
+function clearPreviewCharts() {
+    try {
+        previewCharts.forEach((c) => c && c.destroy && c.destroy());
+    } catch (e) {
+        console.error('Error destroying preview charts:', e);
+    }
+    previewCharts = [];
+    const chartsPreview = document.getElementById('charts-preview');
+    if (chartsPreview) {
+        const cards = chartsPreview.querySelectorAll('.chart-card');
+        cards.forEach((card) => {
+            const placeholder = card.querySelector('.chart-placeholder');
+            if (placeholder) {
+                placeholder.innerHTML = `<div class="chart-icon">📊</div><p>点击生成票房曲线</p>`;
+            }
+            const canvas = card.querySelector('canvas');
+            if (canvas) canvas.remove();
+        });
+    }
+}
+
+function renderAnalysisCharts(charts) {
+    clearPreviewCharts();
+    const chartsPreview = document.getElementById('charts-preview');
+    if (!chartsPreview || !Array.isArray(charts) || charts.length === 0) return;
+
+    const cards = chartsPreview.querySelectorAll('.chart-card');
+    charts.forEach((chartData, idx) => {
+        const card = cards[idx] || null;
+        let targetContainer = null;
+        if (card) {
+            targetContainer = card.querySelector('.chart-placeholder');
+        } else {
+            // 如果占位卡片不足，追加新的卡片
+            const grid = chartsPreview.querySelector('.charts-grid') || chartsPreview;
+            const newCard = document.createElement('div');
+            newCard.className = 'chart-card';
+            newCard.innerHTML = `<div class="chart-header"><h4 class="chart-title">分析图 ${idx+1}</h4></div><div class="chart-placeholder"></div>`;
+            grid.appendChild(newCard);
+            targetContainer = newCard.querySelector('.chart-placeholder');
+        }
+
+        // 清空占位内容并插入canvas
+        targetContainer.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        targetContainer.appendChild(canvas);
+
+        const cfg = { type: chartData.type === 'line' ? 'line' : chartData.type, data: chartData.data, options: { responsive: true, maintainAspectRatio: false } };
+
+        try {
+            const ctx = canvas.getContext('2d');
+            const chart = new Chart(ctx, cfg);
+            previewCharts.push(chart);
+        } catch (e) {
+            console.error('Failed to render preview chart:', e);
+        }
+    });
+}
+
 async function showFileDetails() {
     const notify = window.showNotification || ((message) => console.log(message));
 
@@ -262,12 +367,14 @@ async function showFileDetails() {
         }
 
         setPreviewState('loading');
-        const response = await fetch(`/api/files/history/${fileId}/preview?rowCount=${rowCount}`, {
+        const response = await fetch(`/api/files/${localStorage.getItem('animeflowUserId')}/history/${fileId}/preview?rowCount=${rowCount}`, {
             method: 'GET'
         });
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(errorText || 'Failed to fetch file details');
+            showNotification(`加载预览失败: ${errorText || response.statusText}`, 'error');
+            setPreviewState('empty');
+            return;
         }
 
         const data = await response.json();

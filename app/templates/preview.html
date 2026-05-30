@@ -82,15 +82,12 @@
                 <h3 class="card-title">快速操作</h3>
                 <div class="action-list">
                     <button class="action-btn">
-                        <span class="action-icon">🔍</span>
-                        数据筛选
+                        数据清洗
                     </button>
                     <button class="action-btn">
-                        <span class="action-icon">✂️</span>
                         截取片段
                     </button>
                     <button class="action-btn">
-                        <span class="action-icon">🔄</span>
                         刷新预览
                     </button>
                 </div>
@@ -139,48 +136,12 @@
                     </table>
                 </div>
             </div>
-
-            <!-- 图表预览 -->
-            <div id="charts-preview" class="charts-section" style="display: none;">
-                <h3 class="section-title">快速可视化</h3>
-                <div class="charts-grid">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h4 class="chart-title">票房趋势</h4>
-                            <button class="chart-btn">📤</button>
-                        </div>
-                        <div class="chart-placeholder">
-                            <div class="chart-icon">📊</div>
-                            <p>点击生成票房曲线</p>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h4 class="chart-title">评分分布</h4>
-                            <button class="chart-btn">📤</button>
-                        </div>
-                        <div class="chart-placeholder">
-                            <div class="chart-icon">🥧</div>
-                            <p>点击生成评分占比</p>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h4 class="chart-title">地区热度</h4>
-                            <button class="chart-btn">📤</button>
-                        </div>
-                        <div class="chart-placeholder">
-                            <div class="chart-icon">📉</div>
-                            <p>点击生成热度对比</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </section>
 {% endblock %}
 
 {% block page_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="{{ url_for('static', filename='script/preview.js') }}"></script>
 {% endblock %}

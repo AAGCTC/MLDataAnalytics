@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}数据可视化 - AnimeFlow{% endblock %}
+
+{% block page_styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analysis.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="viz-shell">
+    <!-- ========== 头部区域 ========== -->
+    <header class="viz-hero">
+        <div class="hero-copy">
+            <span class="hero-pill">
+                <span class="pill-dot"></span>AnimeFlow 数据实验室
+            </span>
+            <h1 class="hero-title">极简数据可视化实验室</h1>
+            <p class="hero-subtitle">选择文件、为每个图表映射字段，一次生成多视图结果。</p>
+        </div>
+        <div class="hero-actions">
+            <button class="viz-btn ghost" id="analysis-refresh" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" />
+                </svg>
+                刷新文件
+            </button>
+            <button class="viz-btn primary" id="analysis-generate" type="button">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                生成可视化
+            </button>
+        </div>
+    </header>
+
+    <!-- ========== 主体布局 ========== -->
+    <div class="viz-body">
+        <!-- 左侧控制面板 -->
+        <aside class="viz-controls">
+            <!-- 面板：步骤01 - 选择数据文件 -->
+            <div class="panel" id="panel-file">
+                <div class="panel-head">
+                    <div class="panel-head-left">
+                        <span class="panel-step-badge">01</span>
+                        <div>
+                            <h2 class="panel-title">选择数据文件</h2>
+                            <p class="panel-sub">加载字段后解锁图表配置</p>
+                        </div>
+                    </div>
+                    <div class="panel-status" id="analysis-status">
+                        <span class="status-dot"></span>待机
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <label class="field-label" for="analysis-file">数据文件</label>
+                    <select id="analysis-file" class="viz-select"></select>
+                    <p class="field-meta" id="analysis-file-meta">未选择文件</p>
+
+                    <div class="meta-grid">
+                        <div class="meta-item">
+                            <span class="meta-label-text">总行数</span>
+                            <strong id="analysis-rows">-</strong>
+                        </div>
+                        <div class="meta-item">
+
+                            <span class="meta-label-text">总列数</span>
+                            <strong id="analysis-columns">-</strong>
+                        </div>
+                        <div class="meta-item">
+
+                            <span class="meta-label-text">文件大小</span>
+                            <strong id="analysis-size">-</strong>
+                        </div>
+                        <div class="meta-item">
+
+                            <span class="meta-label-text">上传时间</span>
+                            <strong id="analysis-upload-time">-</strong>
+                        </div>
+                    </div>
+
+                    <div class="panel-actions">
+                        <a class="viz-btn ghost" id="analysis-preview-link" href="/preview">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            </svg>
+                            预览
+                        </a>
+                        <a class="viz-btn soft" href="/upload">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                            </svg>
+                            上传
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 面板：步骤02 - 图表配置 -->
+            <div class="panel" id="panel-charts">
+                <div class="panel-head">
+                    <div class="panel-head-left">
+                        <span class="panel-step-badge">02</span>
+                        <div>
+                            <h2 class="panel-title">图表配置</h2>
+                            <p class="panel-sub">新增图表并为每种类型映射字段</p>
+                        </div>
+                    </div>
+                    <button class="viz-btn outline" id="chart-add" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        新增
+                    </button>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-config-list" id="chart-config-list">
+                        <!-- 空状态提示 -->
+                        <div class="chart-config-empty" id="chart-config-empty">
+                            <span class="empty-graphic">📈</span>
+                            <p>尚未添加图表配置</p>
+                            <span>点击「新增图表」开始构建可视化</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 面板：步骤03 - 机器学习配置 -->
+            <div class="panel" id="panel-ml">
+                <div class="panel-head">
+                    <div class="panel-head-left">
+                        <span class="panel-step-badge">03</span>
+                        <div>
+                            <h2 class="panel-title">机器学习配置</h2>
+                            <p class="panel-sub">新增模型并选择算法与字段</p>
+                        </div>
+                    </div>
+                    <button class="viz-btn outline" id="ml-add" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        新增
+                    </button>
+                </div>
+                <div class="panel-body">
+                    <div class="chart-config-list" id="ml-config-list">
+                        <div class="chart-config-empty" id="ml-config-empty">
+                            <span class="empty-graphic">🧠</span>
+                            <p>尚未添加机器学习配置</p>
+                            <span>点击「新增」添加模型方案</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 面板：步骤03 - 生成 & 状态追踪 -->
+            <div class="panel panel-generate" id="panel-generate">
+                <div class="panel-head">
+                    <div class="panel-head-left">
+                        <span class="panel-step-badge">04</span>
+                        <div>
+                            <h2 class="panel-title">生成可视化</h2>
+                            <p class="panel-sub">字段映射完成后生成</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="status-track" id="analysis-status-track">
+                        <span class="status-step" data-step="load">
+                            读取
+                        </span>
+                        <span class="status-step" data-step="clean">
+                            准备
+                        </span>
+                        <span class="status-step" data-step="model">
+                            构建
+                        </span>
+                        <span class="status-step" data-step="render">
+                            渲染
+                        </span>
+                    </div>
+                    <div class="generate-hint">
+                        <span>配置完成后点击上方「生成可视化」按钮</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧结果区域 -->
+        <section class="viz-result" id="analysis-result">
+            <!-- 空状态 -->
+            <div class="result-empty" id="result-empty">
+                <div class="empty-illustration">
+                    <div class="empty-ring ring-1"></div>
+                    <div class="empty-ring ring-2"></div>
+                    <div class="empty-ring ring-3"></div>
+                    <span class="empty-icon-large">📊</span>
+                </div>
+                <h3>等待生成可视化</h3>
+                <p>在左侧面板中选择数据文件、配置图表字段，<br>然后点击「生成可视化」查看结果。</p>
+                <div class="empty-steps">
+                    <span class="empty-step">① 选择文件</span>
+                    <span class="empty-step-arrow">→</span>
+                    <span class="empty-step">② 配置图表</span>
+                    <span class="empty-step-arrow">→</span>
+                    <span class="empty-step">③ 机器学习配置</span>
+                    <span class="empty-step-arrow">→</span>
+                    <span class="empty-step">④ 生成结果</span>
+                </div>
+            </div>
+
+            <!-- 结果内容（有图表时显示） -->
+            <div class="result-content" id="result-content">
+                <div class="result-head">
+                    <div>
+                        <p class="result-kicker">可视化结果</p>
+                        <h2 class="result-title">图表输出</h2>
+                        <p class="result-sub">生成后图表显示在此处</p>
+                    </div>
+                    <span class="result-tag" id="analysis-canvas-tag">
+                        <span class="tag-dot"></span>等待中
+                    </span>
+                </div>
+
+                <div class="result-grid" id="analysis-chart-grid">
+                    
+                </div>
+                
+
+                
+                <div class="result-notes" id="analysis-notes">
+                    <h3>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="16" x2="12" y2="12" />
+                            <line x1="12" y1="8" x2="12.01" y2="8" />
+                        </svg>
+                        分析摘要
+                    </h3>
+                    <ul id="analysis-report-list"></ul>
+                </div>
+            </div>
+        </section>
+    </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='script/visual.js') }}"></script>
+{% endblock %}
