@@ -143,7 +143,14 @@ def get_file_preview(user_id, file_id):
 #         "y": "value"
 #       }
 #     }
-#   ]
+#   ],
+#   "mlConfig": [{
+#     "type": "regression",
+#      "fields": {
+#         "target": "name",
+#         "feature": "value"
+#       }
+#   }]
 # }
 # 返回数据格式：
 # {

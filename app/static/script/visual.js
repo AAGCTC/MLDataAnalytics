@@ -475,6 +475,22 @@ function handleGenerate() {
     });
     
 
+    
+    const mlPayload = mlConfigs.map((c) => {
+        const type = c.card.querySelector(".card").value;
+        const fieldSelects = c.card.querySelectorAll(".viz-select");
+        const fields = {};
+        fieldSelects.forEach((select) => {
+            const key = select.dataset.field;
+            const value = select.value;
+            if (value) fields[key] = value;
+        });
+        return { type, fields };
+    });
+    if (!configs.length&&!mlPayload.length) {
+        showNotification("请至少添加一个图表", "error");
+        return;
+    }
     // 4. 校验：必填字段是否填写
     let isValid = true;
     configs.forEach((config) => {
@@ -489,21 +505,6 @@ function handleGenerate() {
     });
     if (!isValid) {
         showNotification("请补全必选字段", "error");
-        return;
-    }
-    const mlPayload = mlConfigs.map((c) => {
-        const type = c.card.querySelector(".card").value;
-        const fieldSelects = c.card.querySelectorAll(".viz-select");
-        const fields = {};
-        fieldSelects.forEach((select) => {
-            const key = select.dataset.field;
-            const value = select.value;
-            if (value) fields[key] = value;
-        });
-        return { type, fields };
-    });
-    if (!configs.length&&!mlPayload.length) {
-        showNotification("请至少添加一个图表", "error");
         return;
     }
     showNotification("正在生成图表...", "info");
