@@ -100,6 +100,7 @@ class DataAnalyzer:
         model = LinearRegression()
         model.fit(X_train, y_train)
         y_pred = model.predict(X_test)
+        residuals = y_test.values - y_pred
 
         return {
             'success': True,
@@ -108,7 +109,10 @@ class DataAnalyzer:
             'r2': round(r2_score(y_test, y_pred), 4),
             'rmse': round(np.sqrt(mean_squared_error(y_test, y_pred)), 4),
             'intercept': round(model.intercept_, 4),
-            'coefficients': {col: round(coef, 4) for col, coef in zip(feature_cols, model.coef_)}
+            'coefficients': {col: round(coef, 4) for col, coef in zip(feature_cols, model.coef_)},
+            'y_pred': [round(v, 4) for v in y_pred],
+            'y_true': [round(v, 4) for v in y_test.values],
+            'residuals': [round(v, 4) for v in residuals]
         }
 
     # ========== 分类预测 ==========
@@ -170,12 +174,22 @@ class DataAnalyzer:
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         labels = kmeans.fit_predict(X_scaled)
 
+        # 构建带簇标签的数据点
+        data_points = []
+        for i, (idx, row) in enumerate(X.iterrows()):
+            point = {'cluster': int(labels[i])}
+            for j, col in enumerate(feature_cols):
+                point[col] = float(row[col])
+            data_points.append(point)
+
         return {
             'success': True,
             'type': 'clustering',
             'n_clusters': n_clusters,
             'silhouette_score': round(silhouette_score(X_scaled, labels), 4),
-            'cluster_counts': {int(k): int(v) for k, v in zip(*np.unique(labels, return_counts=True))}
+            'cluster_counts': {int(k): int(v) for k, v in zip(*np.unique(labels, return_counts=True))},
+            'feature_cols': feature_cols,
+            'data_points': data_points
         }
 
 
